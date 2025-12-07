@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retailer Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>Retailer Dashboard</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn btn-danger">Logout</button>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('products')">Browse Products</button>
+            <button class="nav-tab" onclick="showTab('sales')">Record Sales</button>
+            <button class="nav-tab" onclick="showTab('orders')">My Orders</button>
+            <button class="nav-tab" onclick="showTab('returns')">Returns</button>
+            <button class="nav-tab" onclick="showTab('inventory')">My Inventory</button>
+            <button class="nav-tab" onclick="showTab('expenses')">Expenses</button>
+            <button class="nav-tab" onclick="showTab('analytics')">Analytics</button>
+        </div>
+
+        <!-- Products Tab -->
+        <div id="products" class="tab-content active">
+            <div class="card">
+                <h2>Available Products from Warehouses</h2>
+                <div id="productsList"></div>
+            </div>
+        </div>
+
+        <!-- Sales Tab -->
+        <div id="sales" class="tab-content">
+            <div class="card">
+                <h2>Record New Sale</h2>
+                <div class="stats-grid" style="margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <h3>Today's Sales</h3>
+                        <div class="value" id="todaySales">$0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>This Week</h3>
+                        <div class="value" id="weekSales">$0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>This Month</h3>
+                        <div class="value" id="monthSales">$0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Profit</h3>
+                        <div class="value" id="totalProfit">$0</div>
+                    </div>
+                </div>
+                
+                <form onsubmit="recordSale(event)">
+                    <div id="saleItemsContainer">
+                        <h3>Sale Items</h3>
+                        <div class="sale-item" id="saleItem0">
+                            <div class="grid-2">
+                                <div class="form-group">
+                                    <label>Select Product:</label>
+                                    <select class="sale-product" required onchange="updateSaleItemPrice(0)">
+                                        <option value="">Select Product</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Quantity:</label>
+                                    <input type="number" class="sale-quantity" min="1" required onchange="updateSaleTotal()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Price per Unit:</label>
+                                    <input type="number" step="0.01" class="sale-price" required onchange="updateSaleTotal()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Subtotal:</label>
+                                    <input type="text" class="sale-subtotal" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary" onclick="addSaleItem()">+ Add Another Item</button>
+                    
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label>Sale Note (optional):</label>
+                        <textarea id="saleNote" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <h3>Total Amount: <span id="saleTotalAmount">$0.00</span></h3>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Record Sale</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearSaleForm()">Clear</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Sales History</h2>
+                <div style="margin-bottom: 15px;">
+                    <label>Filter by Date:</label>
+                    <input type="date" id="salesStartDate">
+                    <input type="date" id="salesEndDate">
+                    <button class="btn btn-primary" onclick="loadSalesHistory()">Filter</button>
+                    <button class="btn btn-secondary" onclick="clearSalesFilter()">Clear Filter</button>
+                </div>
+                <div id="salesHistoryList"></div>
+            </div>
+        </div>
+
+        <!-- Orders Tab -->
+        <div id="orders" class="tab-content">
+            <div class="card">
+                <h2>My Orders</h2>
+                <div id="ordersList"></div>
+            </div>
+        </div>
+
+        <!-- Returns Tab -->
+        <div id="returns" class="tab-content">
+            <div class="card">
+                <h2>Create Return</h2>
+                <form onsubmit="createReturn(event)">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Select Order:</label>
+                            <select id="returnOrder" onchange="loadOrderProducts()" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Select Product:</label>
+                            <select id="returnProduct" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity:</label>
+                            <input type="number" id="returnQuantity" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Reason:</label>
+                            <textarea id="returnReason" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Return</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>My Returns</h2>
+                <div id="returnsList"></div>
+            </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div id="inventory" class="tab-content">
+            <div class="card">
+                <h2>My Inventory</h2>
+                <div id="inventoryList"></div>
+            </div>
+        </div>
+
+        <!-- Expenses Tab -->
+        <div id="expenses" class="tab-content">
+            <div class="card">
+                <h2>Add Manual Expense</h2>
+                <form onsubmit="addExpense(event)">
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label>Amount:</label>
+                            <input type="number" step="0.01" id="expenseAmount" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category:</label>
+                            <input type="text" id="expenseCategory" placeholder="e.g., Rent, Utilities, Salaries">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Expense</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>My Expenses</h2>
+                <div id="expensesList"></div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <div class="value" id="totalRevenue">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Expense</h3>
+                    <div class="value" id="totalExpense">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Profit</h3>
+                    <div class="value" id="profit">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Rating</h3>
+                    <div class="value" id="avgRating">0.0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Place Order</h2>
+                <button class="close-modal" onclick="closeOrderModal()">&times;</button>
+            </div>
+            <form onsubmit="placeOrder(event)">
+                <input type="hidden" id="orderWarehouseId">
+                <input type="hidden" id="orderProductId">
+                <div class="form-group">
+                    <label>Product:</label>
+                    <input type="text" id="orderProductName" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Warehouse:</label>
+                    <input type="text" id="orderWarehouseName" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Quantity:</label>
+                    <input type="number" id="orderQuantity" required>
+                </div>
+                <div class="form-group">
+                    <label>Unit Price:</label>
+                    <input type="number" step="0.01" id="orderUnitPrice" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Shipping Address:</label>
+                    <textarea id="orderAddress" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Place Order</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rating Modal -->
+    <div id="ratingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rate Order</h2>
+                <button class="close-modal" onclick="closeRatingModal()">&times;</button>
+            </div>
+            <form onsubmit="submitRating(event)">
+                <input type="hidden" id="ratingOrderId">
+                <input type="hidden" id="ratingUserId">
+                <div class="form-group">
+                    <label>Rating:</label>
+                    <div class="rating-stars" id="ratingStars">
+                        <span class="star" onclick="setRating(1)">★</span>
+                        <span class="star" onclick="setRating(2)">★</span>
+                        <span class="star" onclick="setRating(3)">★</span>
+                        <span class="star" onclick="setRating(4)">★</span>
+                        <span class="star" onclick="setRating(5)">★</span>
+                    </div>
+                    <input type="hidden" id="ratingValue" required>
+                </div>
+                <div class="form-group">
+                    <label>Review (optional):</label>
+                    <textarea id="ratingReview" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit Rating</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/retailer.js"></script>
+</body>
+</html>

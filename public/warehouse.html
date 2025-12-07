@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>Warehouse Manager Dashboard</h1>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn btn-danger">Logout</button>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('shipments')">Incoming Shipments</button>
+            <button class="nav-tab" onclick="showTab('inventory')">Inventory</button>
+            <button class="nav-tab" onclick="showTab('orders')">Retailer Orders</button>
+            <button class="nav-tab" onclick="showTab('alerts')">Low Stock Alerts</button>
+            <button class="nav-tab" onclick="showTab('analytics')">Analytics</button>
+        </div>
+
+        <!-- Shipments Tab -->
+        <div id="shipments" class="tab-content active">
+            <div class="card">
+                <h2>Incoming Shipments from Manufacturers</h2>
+                <div id="shipmentsList"></div>
+            </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div id="inventory" class="tab-content">
+            <div class="card">
+                <h2>Warehouse Inventory</h2>
+                <div id="inventoryList"></div>
+            </div>
+        </div>
+
+        <!-- Orders Tab -->
+        <div id="orders" class="tab-content">
+            <div class="card">
+                <h2>Retailer Orders</h2>
+                <div id="ordersList"></div>
+            </div>
+        </div>
+
+        <!-- Alerts Tab -->
+        <div id="alerts" class="tab-content">
+            <div class="card">
+                <h2>Low Stock Alerts</h2>
+                <div id="alertsList"></div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <div class="value" id="totalRevenue">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Expense</h3>
+                    <div class="value" id="totalExpense">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Profit</h3>
+                    <div class="value" id="profit">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Rating</h3>
+                    <div class="value" id="avgRating">0.0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/warehouse.js"></script>
+</body>
+</html>
