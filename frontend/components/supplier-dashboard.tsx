@@ -1,6 +1,4 @@
 "use client"
-
-import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
-import { Home, Package, Truck, DollarSign, Star, Bell, LogOut, Menu, X } from "lucide-react"
+import { SupplierSidebar } from "@/components/supplier-sidebar"
 
 // Mock data
 const materialStockData = [
@@ -50,62 +48,16 @@ const notifications = [
   { id: 4, message: "Payment received for ORD-425", time: "2 days ago" },
 ]
 
-const navItems = [
-  { icon: Home, label: "Dashboard", href: "#" },
-  { icon: Package, label: "Materials Catalog", href: "#" },
-  { icon: Truck, label: "Manufacturer Orders", href: "#" },
-  { icon: DollarSign, label: "Financials", href: "#" },
-  { icon: Star, label: "Ratings & Reviews", href: "#" },
-  { icon: Bell, label: "Notifications/Alerts", href: "#" },
-]
-
 export function SupplierDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-
   return (
     <div className="flex h-screen bg-[#F4F4F4]">
-      {/* Sidebar */}
-      <div
-        className={`fixed left-0 top-0 h-screen bg-[#005461] text-white transition-all duration-300 z-40 ${
-          sidebarOpen ? "w-64" : "w-0"
-        } md:relative md:w-64`}
-      >
-        <div className="p-6 border-b border-[#003D4D]">
-          <h1 className="text-2xl font-bold">SCM</h1>
-          <p className="text-sm text-gray-300">Supplier Portal</p>
-        </div>
-
-        <nav className="p-4 space-y-2">
-          {navItems.map((item, index) => (
-            <a
-              key={index}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[#018790] transition-colors"
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
-
-        <div className="absolute bottom-4 left-4 right-4">
-          <Button variant="outline" className="w-full text-white border-white hover:bg-[#018790] bg-transparent">
-            <LogOut size={16} className="mr-2" />
-            Logout
-          </Button>
-        </div>
-      </div>
+      <SupplierSidebar />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto ml-0 lg:ml-64">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden p-2 hover:bg-gray-100 rounded-lg">
-              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-            <h2 className="text-2xl font-bold text-[#005461]">Supplier Dashboard</h2>
-          </div>
+          <h2 className="text-2xl font-bold text-[#005461]">Supplier Dashboard</h2>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="font-semibold text-gray-800">John Supplier</p>
@@ -149,7 +101,7 @@ export function SupplierDashboard() {
             </Card>
 
             <Card className="bg-white border-0 shadow-sm">
-              <CardHeader className="pb-2">
+              <CardHeader>
                 <CardTitle className="text-sm font-medium text-gray-600">Average Rating</CardTitle>
               </CardHeader>
               <CardContent>
