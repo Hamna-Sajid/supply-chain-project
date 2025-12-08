@@ -1,74 +1,112 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SupplierSidebar } from "@/components/supplier-sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Edit2 } from "lucide-react"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+
 interface Material {
   id: string
-  name: string
+  material_name: string
   description: string
   quantity: number
-  unitPrice: number
-  lastUpdated: string
+  price_per_unit: number
+  created_at: string
 }
 
-const mockMaterials: Material[] = [
-  {
-    id: "MAT-001",
-    name: "Aluminum Sheet",
-    description: "High-grade aluminum sheets for manufacturing",
-    quantity: 500,
-    unitPrice: 45,
-    lastUpdated: "2025-01-15",
-  },
-  {
-    id: "MAT-002",
-    name: "Copper Wire",
-    description: "Pure copper wire for electrical applications",
-    quantity: 1000,
-    unitPrice: 120,
-    lastUpdated: "2025-01-14",
-  },
-  {
-    id: "MAT-003",
-    name: "Steel Rod",
-    description: "Carbon steel rods for structural use",
-    quantity: 300,
-    unitPrice: 65,
-    lastUpdated: "2025-01-13",
-  },
-]
-
 export default function MaterialsCatalogPage() {
-  const [materials, setMaterials] = useState<Material[]>(mockMaterials)
+  const [materials, setMaterials] = useState<Material[]>([])
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     quantity: "",
     unitPrice: "",
   })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  const handleAddMaterial = () => {
-    if (formData.name && formData.quantity && formData.unitPrice) {
-      const newMaterial: Material = {
-        id: `MAT-${String(materials.length + 1).padStart(3, "0")}`,
-        name: formData.name,
-        description: formData.description,
-        quantity: Number.parseInt(formData.quantity),
-        unitPrice: Number.parseFloat(formData.unitPrice),
-        lastUpdated: new Date().toISOString().split("T")[0],
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem("token")
+        if (!token) {
+          setError("Please log in again")
+          return
+        }
+
+        const response = await fetch(`${API_URL}/supplier/materials`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setMaterials(data.materials || [])
+        } else {
+          setError("Failed to load materials")
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load materials")
+      } finally {
+        setLoading(false)
       }
-      setMaterials([...materials, newMaterial])
-      setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
+    }
+
+    fetchMaterials()
+  }, [])
+
+  const handleAddMaterial = async () => {
+    if (formData.name && formData.quantity && formData.unitPrice) {
+      try {
+        const token = localStorage.getItem("token")
+        const response = await fetch(`${API_URL}/supplier/materials`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            material_name: formData.name,
+            description: formData.description,
+            quantity_available: Number.parseInt(formData.quantity),
+            unit_price: Number.parseFloat(formData.unitPrice),
+          }),
+        })
+
+        if (response.ok) {
+          const newMaterial = await response.json()
+          setMaterials([...materials, newMaterial])
+          setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
+        } else {
+          const errorData = await response.json()
+          setError(errorData.error || "Failed to add material")
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add material")
+      }
     }
   }
 
-  const handleDelete = (id: string) => {
-    setMaterials(materials.filter((m) => m.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${API_URL}/supplier/materials/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        setMaterials(materials.filter((m) => m.material_id !== id))
+      } else {
+        setError("Failed to delete material")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete material")
+    }
   }
 
   return (
@@ -83,7 +121,18 @@ export default function MaterialsCatalogPage() {
             <p className="text-gray-600 mt-2">Manage your raw materials inventory</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">Loading materials...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Panel - Add New Material */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
@@ -164,11 +213,11 @@ export default function MaterialsCatalogPage() {
                     <tbody>
                       {materials.map((material) => (
                         <tr key={material.id} className="border-b hover:bg-gray-50">
-                          <td className="py-3 px-4 font-medium">{material.id}</td>
-                          <td className="py-3 px-4">{material.name}</td>
-                          <td className="py-3 px-4">{material.quantity} units</td>
-                          <td className="py-3 px-4">${material.unitPrice.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-gray-600">{material.lastUpdated}</td>
+                          <td className="py-3 px-4 font-medium">{material.material_id}</td>
+                          <td className="py-3 px-4">{material.material_name}</td>
+                          <td className="py-3 px-4">{material.quantity_available} units</td>
+                          <td className="py-3 px-4">${material.unit_price.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-gray-600">{new Date(material.created_at).toLocaleDateString()}</td>
                           <td className="py-3 px-4 flex gap-2">
                             <Button size="sm" variant="outline" className="h-7 bg-transparent">
                               <Edit2 size={14} />
@@ -177,7 +226,7 @@ export default function MaterialsCatalogPage() {
                               size="sm"
                               variant="outline"
                               className="h-7 text-red-600 hover:text-red-700 bg-transparent"
-                              onClick={() => handleDelete(material.id)}
+                              onClick={() => handleDelete(material.material_id)}
                             >
                               <Trash2 size={14} />
                             </Button>
@@ -189,7 +238,8 @@ export default function MaterialsCatalogPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
