@@ -1,4 +1,14 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+interface KPIData {
+  todaysSalesRevenue: number
+  totalProfit: number
+  lowStockItems: number
+  pendingReturns: number
+}
 
 interface RetailerKPICardProps {
   title: string
@@ -27,12 +37,74 @@ function RetailerKPICard({ title, value, subtitle, icon }: RetailerKPICardProps)
 }
 
 export function RetailerKPICards() {
+  const [data, setData] = useState<KPIData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem("token")
+        if (!token) {
+          return
+        }
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/retailer/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("API Error:", errorText)
+          return
+        }
+
+        const dashboardData = await response.json()
+        setData(dashboardData)
+      } catch (error) {
+        console.error("Error fetching dashboard:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboard()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="text-center py-4 text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <RetailerKPICard title="Today's Sales Revenue" value="$8,450" icon="💰" subtitle="Total sales today" />
-      <RetailerKPICard title="Total Net Profit" value="$2,340" icon="📈" subtitle="Month to date" />
-      <RetailerKPICard title="Low Stock Items" value="12" icon="⚠️" subtitle="Requires reorder" />
-      <RetailerKPICard title="Pending Returns" value="5" icon="↩️" subtitle="Awaiting approval" />
+      <RetailerKPICard 
+        title="Today's Sales Revenue" 
+        value={`$${data?.todaysSalesRevenue || 0}`} 
+        icon="💰" 
+        subtitle="Total sales today" 
+      />
+      <RetailerKPICard 
+        title="Total Net Profit" 
+        value={`$${data?.totalProfit || 0}`} 
+        icon="📈" 
+        subtitle="Month to date" 
+      />
+      <RetailerKPICard 
+        title="Low Stock Items" 
+        value={data?.lowStockItems || 0} 
+        icon="⚠️" 
+        subtitle="Requires reorder" 
+      />
+      <RetailerKPICard 
+        title="Pending Returns" 
+        value={data?.pendingReturns || 0} 
+        icon="↩️" 
+        subtitle="Awaiting approval" 
+      />
     </div>
   )
 }

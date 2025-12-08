@@ -1,13 +1,13 @@
 import { Sidebar } from "@/components/sidebar"
 import { WarehouseHeader } from "@/components/warehouse-header"
-import { ReturnTracking } from "@/components/return-tracking"
+import { QuickSalePOS } from "@/components/quick-sale-pos"
 
 export const metadata = {
-  title: "Returns | Retailer Dashboard",
-  description: "Manage product returns",
+  title: "POS System | Retailer Dashboard",
+  description: "Point of Sale System",
 }
 
-export default function ReturnsPage() {
+export default function POSPage() {
   return (
     <div className="flex">
       <Sidebar />
@@ -18,12 +18,12 @@ export default function ReturnsPage() {
 
           <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
-              Return Management
+              Point of Sale System
             </h1>
-            <p className="text-gray-600 mt-2">Track and manage product returns</p>
+            <p className="text-gray-600 mt-2">Record sales transactions</p>
           </div>
 
-          <ReturnTracking />
+          <QuickSalePOS />
         </div>
       </main>
     </div>

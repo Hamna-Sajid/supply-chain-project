@@ -1,13 +1,13 @@
 import { Sidebar } from "@/components/sidebar"
 import { WarehouseHeader } from "@/components/warehouse-header"
-import { ReturnTracking } from "@/components/return-tracking"
+import { ProductSourcingPanel } from "@/components/product-sourcing-panel"
 
 export const metadata = {
-  title: "Returns | Retailer Dashboard",
-  description: "Manage product returns",
+  title: "Orders | Retailer Dashboard",
+  description: "Manage orders from suppliers",
 }
 
-export default function ReturnsPage() {
+export default function OrdersPage() {
   return (
     <div className="flex">
       <Sidebar />
@@ -18,12 +18,12 @@ export default function ReturnsPage() {
 
           <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
-              Return Management
+              Order Management
             </h1>
-            <p className="text-gray-600 mt-2">Track and manage product returns</p>
+            <p className="text-gray-600 mt-2">Place and manage orders from suppliers</p>
           </div>
 
-          <ReturnTracking />
+          <ProductSourcingPanel />
         </div>
       </main>
     </div>
