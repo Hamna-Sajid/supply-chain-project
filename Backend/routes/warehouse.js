@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const pool = require('../../config/database');
+const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
 // Browse all raw materials
 router.get('/raw-materials', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {

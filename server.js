@@ -4,13 +4,13 @@ const bodyParser = require('body-parser');
 const path = require('path');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth');
-const supplierRoutes = require('./routes/supplier');
-const manufacturerRoutes = require('./routes/manufacturer');
-const warehouseRoutes = require('./routes/warehouse');
-const retailerRoutes = require('./routes/retailer');
-const ratingRoutes = require('./routes/rating');
-const analyticsRoutes = require('./routes/analytics');
+const authRoutes = require('./Backend/routes/auth');
+const supplierRoutes = require('./Backend/routes/supplier');
+const manufacturerRoutes = require('./Backend/routes/manufacturer');
+const warehouseRoutes = require('./Backend/routes/warehouse');
+const retailerRoutes = require('./Backend/routes/retailer');
+const ratingRoutes = require('./Backend/routes/rating');
+const analyticsRoutes = require('./Backend/routes/analytics');
 
 const app = express();
 
@@ -19,8 +19,11 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from Frontend-html directory
+app.use(express.static(path.join(__dirname, 'Frontend-html')));
+
+// Serve Backend/logic files as static
+app.use('/logic', express.static(path.join(__dirname, 'Backend/logic')));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -42,7 +45,7 @@ app.get('/api/health', (req, res) => {
 
 // Serve index.html for root route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'Frontend-html', 'index.html'));
 });
 
 // Error handling middleware
