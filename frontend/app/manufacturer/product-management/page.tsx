@@ -1,43 +1,122 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ManufacturerSidebar } from "@/components/manufacturer-sidebar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2 } from "lucide-react"
 
-const products = [
-  { id: 1, name: "Component A", sku: "COMP-001", stage: "Design", startDate: "2025-01-05", quantity: 1000 },
-  { id: 2, name: "Component B", sku: "COMP-002", stage: "Manufacturing", startDate: "2025-01-03", quantity: 500 },
-  { id: 3, name: "Assembly Unit", sku: "ASS-001", stage: "Quality Check", startDate: "2024-12-28", quantity: 250 },
-]
+interface Product {
+  product_id: string
+  product_name: string
+  sku: string
+  production_stage: string
+  quantity: number
+  created_at?: string
+}
 
 export default function ProductManagement() {
-  const [products_state, setProducts] = useState(products)
+  const [products_state, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", sku: "", stage: "Design", quantity: "" })
 
-  const handleAddProduct = () => {
-    if (formData.name && formData.sku && formData.quantity) {
-      setProducts([
-        ...products_state,
-        {
-          id: products_state.length + 1,
-          name: formData.name,
-          sku: formData.sku,
-          stage: formData.stage,
-          startDate: new Date().toISOString().split("T")[0],
-          quantity: Number.parseInt(formData.quantity),
+  // Fetch products on component load
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    try {
+      setIsLoading(true)
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      ])
-      setFormData({ name: "", sku: "", stage: "Design", quantity: "" })
-      setShowForm(false)
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch products")
+      }
+
+      const data = await response.json()
+      setProducts(data.products || [])
+      setError(null)
+    } catch (err) {
+      console.error("Error fetching products:", err)
+      setError(err instanceof Error ? err.message : "Error loading products")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleDeleteProduct = (id: number) => {
-    setProducts(products_state.filter((p) => p.id !== id))
+  const handleAddProduct = async () => {
+    if (!formData.name || !formData.sku || !formData.quantity) {
+      setError("Please fill in all fields")
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_name: formData.name,
+          sku: formData.sku,
+          production_stage: formData.stage,
+          quantity: Number.parseInt(formData.quantity),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to create product")
+      }
+
+      setFormData({ name: "", sku: "", stage: "Design", quantity: "" })
+      setShowForm(false)
+      setError(null)
+      await fetchProducts()
+    } catch (err) {
+      console.error("Error adding product:", err)
+      setError(err instanceof Error ? err.message : "Error creating product")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete product")
+      }
+
+      setProducts(products_state.filter((p) => p.product_id !== id))
+      setError(null)
+    } catch (err) {
+      console.error("Error deleting product:", err)
+      setError(err instanceof Error ? err.message : "Error deleting product")
+    }
   }
 
   return (
@@ -62,6 +141,8 @@ export default function ProductManagement() {
               New Product
             </Button>
           </div>
+
+          {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
 
           {showForm && (
             <Card className="mb-6 border-0 shadow-sm">
@@ -114,8 +195,13 @@ export default function ProductManagement() {
                   <Button variant="outline" onClick={() => setShowForm(false)}>
                     Cancel
                   </Button>
-                  <Button style={{ backgroundColor: "#018790" }} className="text-white" onClick={handleAddProduct}>
-                    Add Product
+                  <Button
+                    style={{ backgroundColor: "#018790" }}
+                    className="text-white"
+                    onClick={handleAddProduct}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Creating..." : "Add Product"}
                   </Button>
                 </div>
               </CardContent>
@@ -127,55 +213,61 @@ export default function ProductManagement() {
               <CardTitle>Active Production</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b" style={{ borderColor: "#E5E7EB" }}>
-                      <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        Product Name
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        SKU
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        Production Stage
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        Start Date
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        Quantity
-                      </th>
-                      <th className="text-center py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products_state.map((product) => (
-                      <tr key={product.id} className="border-b hover:bg-gray-100 transition-colors">
-                        <td className="py-3 px-4 font-medium">{product.name}</td>
-                        <td className="py-3 px-4">{product.sku}</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                            style={{ backgroundColor: "#018790" }}
-                          >
-                            {product.stage}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">{product.startDate}</td>
-                        <td className="py-3 px-4">{product.quantity} units</td>
-                        <td className="py-3 px-4 text-center">
-                          <Button size="sm" variant="outline" onClick={() => handleDeleteProduct(product.id)}>
-                            <Trash2 size={16} />
-                          </Button>
-                        </td>
+              {isLoading ? (
+                <div className="text-center py-8 text-gray-500">Loading products...</div>
+              ) : products_state.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No products found. Create your first product!</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b" style={{ borderColor: "#E5E7EB" }}>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Product Name
+                        </th>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          SKU
+                        </th>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Production Stage
+                        </th>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Quantity
+                        </th>
+                        <th className="text-center py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Action
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {products_state.map((product) => (
+                        <tr key={product.product_id} className="border-b hover:bg-gray-100 transition-colors">
+                          <td className="py-3 px-4 font-medium">{product.product_name}</td>
+                          <td className="py-3 px-4">{product.sku}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                              style={{ backgroundColor: "#018790" }}
+                            >
+                              {product.production_stage}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">{product.quantity} units</td>
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteProduct(product.product_id)}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
