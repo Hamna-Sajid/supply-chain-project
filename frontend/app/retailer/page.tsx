@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { RetailerKPICards } from "@/components/retailer-kpi-cards"
 import { SalesAnalyticsChart } from "@/components/sales-analytics-chart"
 import { QuickSalePOS } from "@/components/quick-sale-pos"
@@ -16,9 +17,11 @@ export default function RetailerDashboard() {
       <Sidebar />
 
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
               Retailer Dashboard
             </h1>

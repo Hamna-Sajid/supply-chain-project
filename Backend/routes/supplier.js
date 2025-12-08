@@ -3,8 +3,16 @@ const router = express.Router();
 const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
+// Custom middleware for case-insensitive role checking
+const checkSupplierRole = (req, res, next) => {
+  if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('supplier')) {
+    return res.status(403).json({ error: 'Access denied for this role' });
+  }
+  next();
+};
+
 // Add raw material
-router.post('/materials', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.post('/materials', authenticateToken, checkSupplierRole, async (req, res) => {
   const { material_name, description, quantity_available, unit_price } = req.body;
   
   try {
@@ -30,7 +38,7 @@ router.post('/materials', authenticateToken, authorizeRole('supplier'), async (r
 });
 
 // Get supplier's materials
-router.get('/materials', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/materials', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('raw_materials')
@@ -47,7 +55,7 @@ router.get('/materials', authenticateToken, authorizeRole('supplier'), async (re
 });
 
 // Update material
-router.put('/materials/:id', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.put('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { material_name, description, quantity_available, unit_price } = req.body;
   
@@ -79,7 +87,7 @@ router.put('/materials/:id', authenticateToken, authorizeRole('supplier'), async
 });
 
 // View orders for supplier
-router.get('/orders', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/orders', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('orders')
@@ -101,7 +109,7 @@ router.get('/orders', authenticateToken, authorizeRole('supplier'), async (req, 
 });
 
 // Update order status
-router.put('/orders/:id/status', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
@@ -131,7 +139,7 @@ router.put('/orders/:id/status', authenticateToken, authorizeRole('supplier'), a
 });
 
 // Get supplier dashboard data
-router.get('/dashboard', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     // Total revenue
     const { data: revenueData, error: revenueError } = await supabase
@@ -187,7 +195,7 @@ router.get('/dashboard', authenticateToken, authorizeRole('supplier'), async (re
 });
 
 // Get supplier ratings
-router.get('/ratings', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/ratings', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('ratings')
@@ -218,7 +226,7 @@ router.get('/ratings', authenticateToken, authorizeRole('supplier'), async (req,
 });
 
 // Get material stock overview
-router.get('/materials/stock/overview', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/materials/stock/overview', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('raw_materials')
@@ -237,7 +245,7 @@ router.get('/materials/stock/overview', authenticateToken, authorizeRole('suppli
 });
 
 // Delete material
-router.delete('/materials/:id', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.delete('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -263,7 +271,7 @@ router.delete('/materials/:id', authenticateToken, authorizeRole('supplier'), as
 });
 
 // Get pending orders
-router.get('/orders/pending', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/orders/pending', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('orders')
@@ -288,7 +296,7 @@ router.get('/orders/pending', authenticateToken, authorizeRole('supplier'), asyn
 });
 
 // Get notifications
-router.get('/notifications', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/notifications', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('notifications')
@@ -306,7 +314,7 @@ router.get('/notifications', authenticateToken, authorizeRole('supplier'), async
 });
 
 // Get revenue
-router.get('/revenue', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('revenue')
@@ -324,7 +332,7 @@ router.get('/revenue', authenticateToken, authorizeRole('supplier'), async (req,
 });
 
 // Get expenses
-router.get('/expenses', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('expense')
@@ -342,7 +350,7 @@ router.get('/expenses', authenticateToken, authorizeRole('supplier'), async (req
 });
 
 // Add expense
-router.post('/expenses', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
   const { amount, category, description } = req.body;
   
   try {
@@ -367,7 +375,7 @@ router.post('/expenses', authenticateToken, authorizeRole('supplier'), async (re
 });
 
 // Delete expense
-router.delete('/expenses/:id', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.delete('/expenses/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   
   try {

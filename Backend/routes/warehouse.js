@@ -3,12 +3,20 @@ const router = express.Router();
 const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
+// Custom middleware for case-insensitive role checking
+const checkWarehouseRole = (req, res, next) => {
+  if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('warehouse')) {
+    return res.status(403).json({ error: 'Access denied for this role' });
+  }
+  next();
+};
+
 // ============================================
 // SHIPMENT MANAGEMENT (from manufacturers)
 // ============================================
 
 // Get incoming shipments for warehouse
-router.get('/shipments', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.get('/shipments', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('shipments')
@@ -42,7 +50,7 @@ router.get('/shipments', authenticateToken, authorizeRole('warehouse_manager'), 
 });
 
 // Accept incoming shipment
-router.put('/shipments/:id/accept', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -68,7 +76,7 @@ router.put('/shipments/:id/accept', authenticateToken, authorizeRole('warehouse_
 });
 
 // Reject incoming shipment
-router.put('/shipments/:id/reject', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.put('/shipments/:id/reject', authenticateToken, checkWarehouseRole, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -98,7 +106,7 @@ router.put('/shipments/:id/reject', authenticateToken, authorizeRole('warehouse_
 // ============================================
 
 // Get warehouse inventory
-router.get('/inventory', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.get('/inventory', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('inventory')
@@ -132,7 +140,7 @@ router.get('/inventory', authenticateToken, authorizeRole('warehouse_manager'), 
 });
 
 // Get low stock items
-router.get('/inventory/low-stock', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.get('/inventory/low-stock', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('inventory')
@@ -170,7 +178,7 @@ router.get('/inventory/low-stock', authenticateToken, authorizeRole('warehouse_m
 // ============================================
 
 // Get orders pending fulfillment
-router.get('/orders', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.get('/orders', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
     // Get orders that are pending or processing (warehouse fulfillment ready)
     const { data, error } = await supabase
@@ -205,7 +213,7 @@ router.get('/orders', authenticateToken, authorizeRole('warehouse_manager'), asy
 });
 
 // Update order fulfillment status
-router.put('/orders/:id/status', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.put('/orders/:id/status', authenticateToken, checkWarehouseRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -239,7 +247,7 @@ router.put('/orders/:id/status', authenticateToken, authorizeRole('warehouse_man
 // ============================================
 
 // Get warehouse dashboard data
-router.get('/dashboard', authenticateToken, authorizeRole('warehouse_manager'), async (req, res) => {
+router.get('/dashboard', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
     console.log(`Fetching dashboard for warehouse: ${req.user.userId}`);
 

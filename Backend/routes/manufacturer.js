@@ -3,8 +3,16 @@ const router = express.Router();
 const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
+// Custom middleware to handle case-insensitive role checking
+const checkManufacturerRole = (req, res, next) => {
+  if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('manufacturer')) {
+    return res.status(403).json({ error: 'Access denied for this role' });
+  }
+  next();
+};
+
 // Get dashboard KPIs
-router.get('/dashboard', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/dashboard', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     // Get total products created
     const { data: productionData, error: prodError } = await supabase
@@ -52,7 +60,7 @@ router.get('/dashboard', authenticateToken, authorizeRole('manufacturer'), async
 });
 
 // Browse all raw materials
-router.get('/raw-materials', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/raw-materials', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('raw_materials')
@@ -111,7 +119,7 @@ router.get('/raw-materials', authenticateToken, authorizeRole('manufacturer'), a
 });
 
 // Get products
-router.get('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/products', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('products')
@@ -128,7 +136,7 @@ router.get('/products', authenticateToken, authorizeRole('manufacturer'), async 
 });
 
 // Create product
-router.post('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.post('/products', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { product_name, sku, production_stage, quantity } = req.body;
 
   try {
@@ -154,7 +162,7 @@ router.post('/products', authenticateToken, authorizeRole('manufacturer'), async
 });
 
 // Delete product
-router.delete('/products/:id', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.delete('/products/:id', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -180,7 +188,7 @@ router.delete('/products/:id', authenticateToken, authorizeRole('manufacturer'),
 });
 
 // Get inventory
-router.get('/inventory', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/inventory', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('inventory')
@@ -200,7 +208,7 @@ router.get('/inventory', authenticateToken, authorizeRole('manufacturer'), async
 });
 
 // Add to inventory
-router.post('/inventory', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.post('/inventory', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { product_id, quantity_available, cost_price, selling_price, reorder_level } = req.body;
 
   try {
@@ -227,7 +235,7 @@ router.post('/inventory', authenticateToken, authorizeRole('manufacturer'), asyn
 });
 
 // View all warehouses
-router.get('/warehouses', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/warehouses', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -245,7 +253,7 @@ router.get('/warehouses', authenticateToken, authorizeRole('manufacturer'), asyn
 });
 
 // Create shipment to warehouse
-router.post('/shipments', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.post('/shipments', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { warehouse_id, product_id, quantity, shipping_address, expected_delivery_date } = req.body;
 
   try {
@@ -273,7 +281,7 @@ router.post('/shipments', authenticateToken, authorizeRole('manufacturer'), asyn
 });
 
 // Get shipments
-router.get('/shipments', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/shipments', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('shipments')
@@ -293,7 +301,7 @@ router.get('/shipments', authenticateToken, authorizeRole('manufacturer'), async
 });
 
 // Place order for raw materials
-router.post('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { supplier_id, items } = req.body;
 
   try {
@@ -332,7 +340,7 @@ router.post('/orders', authenticateToken, authorizeRole('manufacturer'), async (
 });
 
 // Get orders
-router.get('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('orders')
@@ -354,7 +362,7 @@ router.get('/orders', authenticateToken, authorizeRole('manufacturer'), async (r
 });
 
 // Get analytics data
-router.get('/analytics', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+router.get('/analytics', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     // Get revenue data
     const { data: revenueData, error: revError } = await supabase
