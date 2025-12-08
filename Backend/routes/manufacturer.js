@@ -1,115 +1,200 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../../config/database');
+const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
+
+// Get dashboard KPIs
+router.get('/dashboard', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  try {
+    // Get total products created
+    const { data: productionData, error: prodError } = await supabase
+      .from('products')
+      .select('product_id')
+      .eq('manufacturer_id', req.user.userId);
+
+    // Get total inventory
+    const { data: inventoryData, error: invError } = await supabase
+      .from('inventory')
+      .select('quantity_available')
+      .eq('user_id', req.user.userId);
+
+    // Get total orders placed
+    const { data: ordersData, error: ordError } = await supabase
+      .from('orders')
+      .select('order_id')
+      .eq('ordered_by', req.user.userId);
+
+    // Get total shipments
+    const { data: shipmentsData, error: shipError } = await supabase
+      .from('shipments')
+      .select('shipment_id')
+      .eq('manufacturer_id', req.user.userId);
+
+    if (prodError || invError || ordError || shipError) {
+      throw prodError || invError || ordError || shipError;
+    }
+
+    const totalProduction = (productionData || []).length;
+    const totalInventory = (inventoryData || []).reduce((sum, i) => sum + (i.quantity_available || 0), 0);
+    const totalOrders = (ordersData || []).length;
+    const totalShipments = (shipmentsData || []).length;
+
+    res.json({
+      totalProduction,
+      totalInventory,
+      totalOrders,
+      totalShipments
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Browse all raw materials
 router.get('/raw-materials', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT rm.*, u.name as supplier_name, 
-              COALESCE(AVG(r.rating_value), 0) as avg_rating,
-              COUNT(r.rating_id) as rating_count
-       FROM raw_materials rm
-       JOIN users u ON rm.supplier_id = u.user_id
-       LEFT JOIN ratings r ON r.given_to = u.user_id
-       GROUP BY rm.material_id, u.name
-       ORDER BY avg_rating DESC, rm.unit_price ASC`
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .select('*');
+
+    if (error) {
+      console.error('Raw materials error:', error);
+      throw error;
+    }
+
+    console.log('Raw materials found:', data?.length || 0);
+    console.log('Raw materials sample:', JSON.stringify(data?.[0], null, 2));
+    
+    // Fetch supplier names for each material
+    const materialsWithSuppliers = await Promise.all(
+      (data || []).map(async (material) => {
+        let supplierName = 'Unknown Supplier';
+        
+        // Try to get supplier from supplier_id if it exists
+        if (material.supplier_id) {
+          try {
+            console.log(`Fetching supplier for ID: ${material.supplier_id}`);
+            const { data: supplierData, error: supplierError } = await supabase
+              .from('users')
+              .select('name')
+              .eq('user_id', material.supplier_id)
+              .single();
+            
+            console.log(`Supplier lookup result:`, { supplierData, supplierError });
+            
+            if (!supplierError && supplierData?.name) {
+              supplierName = supplierData.name;
+              console.log(`Found supplier name: ${supplierName}`);
+            } else if (supplierError) {
+              console.error(`Error fetching supplier ${material.supplier_id}:`, supplierError);
+            }
+          } catch (e) {
+            console.error('Supplier fetch exception:', e);
+          }
+        } else {
+          console.log(`No supplier_id for material: ${material.material_name}`);
+        }
+        
+        return {
+          ...material,
+          supplier_name: supplierName,
+        };
+      })
     );
-    res.json(result.rows);
+
+    res.json(materialsWithSuppliers || []);
   } catch (error) {
     console.error('Get raw materials error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Place order for raw materials
-router.post('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { supplier_id, items, shipping_address } = req.body;
-  
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    
-    // Create order
-    const orderResult = await client.query(
-      `INSERT INTO orders (ordered_by, delivered_by, shipping_address, order_status)
-       VALUES ($1, $2, $3, 'pending') RETURNING *`,
-      [req.user.userId, supplier_id, shipping_address]
-    );
-    
-    const orderId = orderResult.rows[0].order_id;
-    
-    // Add order items
-    for (const item of items) {
-      await client.query(
-        `INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, item.material_id, item.quantity, item.unit_price]
-      );
-    }
-    
-    await client.query('COMMIT');
-    res.status(201).json(orderResult.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Place order error:', error);
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    client.release();
-  }
-});
-
-// Create product
-router.post('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { product_name, category, size, color, cost_price, selling_price, production_stage } = req.body;
-  
-  try {
-    const result = await pool.query(
-      `INSERT INTO products (product_name, category, size, color, cost_price, selling_price, manufacturer_id, production_stage)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [product_name, category, size, color, cost_price, selling_price, req.user.userId, production_stage]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Create product error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Get manufacturer's products
+// Get products
 router.get('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM products WHERE manufacturer_id = $1',
-      [req.user.userId]
-    );
-    res.json(result.rows);
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('manufacturer_id', req.user.userId);
+
+    if (error) throw error;
+
+    res.json({ products: data || [] });
   } catch (error) {
     console.error('Get products error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Update product stage
-router.put('/products/:id/stage', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { id } = req.params;
-  const { production_stage } = req.body;
-  
+// Create product
+router.post('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  const { product_name, sku, production_stage, quantity } = req.body;
+
   try {
-    const result = await pool.query(
-      `UPDATE products SET production_stage = $1 
-       WHERE product_id = $2 AND manufacturer_id = $3 RETURNING *`,
-      [production_stage, id, req.user.userId]
-    );
-    
-    if (result.rows.length === 0) {
+    const { data, error } = await supabase
+      .from('products')
+      .insert([{
+        product_name,
+        sku,
+        production_stage,
+        quantity,
+        manufacturer_id: req.user.userId
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Create product error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create product' });
+  }
+});
+
+// Delete product
+router.delete('/products/:id', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .delete()
+      .eq('product_id', id)
+      .eq('manufacturer_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error('Update product stage error:', error);
+    console.error('Delete product error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get inventory
+router.get('/inventory', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory')
+      .select(`
+        *,
+        products(product_name)
+      `)
+      .eq('user_id', req.user.userId);
+
+    if (error) throw error;
+
+    res.json({ inventory: data || [] });
+  } catch (error) {
+    console.error('Get inventory error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -117,34 +202,42 @@ router.put('/products/:id/stage', authenticateToken, authorizeRole('manufacturer
 // Add to inventory
 router.post('/inventory', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
   const { product_id, quantity_available, cost_price, selling_price, reorder_level } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `INSERT INTO inventory (product_id, user_id, quantity_available, cost_price, selling_price, reorder_level)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [product_id, req.user.userId, quantity_available, cost_price, selling_price, reorder_level]
-    );
-    res.status(201).json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('inventory')
+      .insert([{
+        product_id,
+        user_id: req.user.userId,
+        quantity_available,
+        cost_price,
+        selling_price,
+        reorder_level
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
   } catch (error) {
     console.error('Add inventory error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: error.message || 'Failed to add inventory' });
   }
 });
 
 // View all warehouses
 router.get('/warehouses', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT u.user_id, u.name, u.address, u.contact_number,
-              COALESCE(AVG(r.rating_value), 0) as avg_rating,
-              COUNT(r.rating_id) as rating_count
-       FROM users u
-       LEFT JOIN ratings r ON r.given_to = u.user_id
-       WHERE u.role = 'warehouse_manager'
-       GROUP BY u.user_id
-       ORDER BY avg_rating DESC`
-    );
-    res.json(result.rows);
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'warehouse_manager')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data || []);
   } catch (error) {
     console.error('Get warehouses error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -154,16 +247,144 @@ router.get('/warehouses', authenticateToken, authorizeRole('manufacturer'), asyn
 // Create shipment to warehouse
 router.post('/shipments', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
   const { warehouse_id, product_id, quantity, shipping_address, expected_delivery_date } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `INSERT INTO shipments (manufacturer_id, whm_id, product_id, quantity, shipping_address, expected_delivery_date, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'preparing') RETURNING *`,
-      [req.user.userId, warehouse_id, product_id, quantity, shipping_address, expected_delivery_date]
-    );
-    res.status(201).json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('shipments')
+      .insert([{
+        manufacturer_id: req.user.userId,
+        warehouse_id,
+        product_id,
+        quantity,
+        shipping_address,
+        expected_delivery_date,
+        status: 'preparing'
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
   } catch (error) {
     console.error('Create shipment error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create shipment' });
+  }
+});
+
+// Get shipments
+router.get('/shipments', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('shipments')
+      .select(`
+        *,
+        products(product_name)
+      `)
+      .eq('manufacturer_id', req.user.userId);
+
+    if (error) throw error;
+
+    res.json({ shipments: data || [] });
+  } catch (error) {
+    console.error('Get shipments error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Place order for raw materials
+router.post('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  const { supplier_id, items } = req.body;
+
+  try {
+    // Create order
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        ordered_by: req.user.userId,
+        delivered_by: supplier_id,
+        order_status: 'pending'
+      }])
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    // Add order items
+    for (const item of items) {
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert([{
+          order_id: orderData.order_id,
+          product_id: item.material_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        }]);
+
+      if (itemError) throw itemError;
+    }
+
+    res.status(201).json(orderData);
+  } catch (error) {
+    console.error('Place order error:', error);
+    res.status(500).json({ error: error.message || 'Failed to place order' });
+  }
+});
+
+// Get orders
+router.get('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        users!orders_delivered_by_fkey(name),
+        order_items(*)
+      `)
+      .eq('ordered_by', req.user.userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ orders: data || [] });
+  } catch (error) {
+    console.error('Get orders error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get analytics data
+router.get('/analytics', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+  try {
+    // Get revenue data
+    const { data: revenueData, error: revError } = await supabase
+      .from('orders')
+      .select('total_amount, created_at')
+      .eq('ordered_by', req.user.userId)
+      .eq('order_status', 'delivered');
+
+    // Get expense data
+    const { data: expenseData, error: expError } = await supabase
+      .from('inventory')
+      .select('cost_price, quantity_available')
+      .eq('user_id', req.user.userId);
+
+    if (revError || expError) {
+      throw revError || expError;
+    }
+
+    // Calculate totals
+    const totalRevenue = (revenueData || []).reduce((sum, r) => sum + (r.total_amount || 0), 0);
+    const totalExpense = (expenseData || []).reduce((sum, e) => sum + ((e.cost_price || 0) * (e.quantity_available || 0)), 0);
+
+    res.json({
+      totalRevenue,
+      totalExpense,
+      netProfit: totalRevenue - totalExpense,
+      yearToDateRevenue: totalRevenue
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
