@@ -1,27 +1,48 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Menu, X, LayoutDashboard, Truck, Package, ShoppingCart, BarChart3, LogOut } from "lucide-react"
+import { Menu, X, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
-  { label: "Dashboard", href: "/warehouse/dashboard", icon: LayoutDashboard },
-  { label: "Incoming Shipments", href: "/warehouse/incoming-shipments", icon: Truck },
-  { label: "Warehouse Inventory", href: "/warehouse/inventory", icon: Package },
-  { label: "Retailer Orders", href: "/warehouse/retailer-orders", icon: ShoppingCart },]
+  { label: "Dashboard", id: "dashboard", icon: "🏠" },
+  { label: "Incoming Shipments", id: "shipments", icon: "📦" },
+  { label: "Inventory Management", id: "inventory", icon: "📊" },
+  { label: "Order Fulfillment", id: "orders", icon: "🚚" },
+]
 
 export function WarehouseSidebar() {
   const [isOpen, setIsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("dashboard")
   const router = useRouter()
 
+  // Get active tab from localStorage or sessionStorage
+  useEffect(() => {
+    const stored = sessionStorage.getItem("warehouseActiveTab")
+    if (stored) {
+      setActiveTab(stored)
+    }
+  }, [])
+
+  const handleNavClick = (id: string) => {
+    setActiveTab(id)
+    sessionStorage.setItem("warehouseActiveTab", id)
+    setIsOpen(false)
+    // Trigger a custom event to notify WarehouseTabs component
+    window.dispatchEvent(new CustomEvent("warehouseTabChange", { detail: { tab: id } }))
+  }
+
   const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    sessionStorage.removeItem("warehouseActiveTab")
     router.push("/")
   }
 
   return (
     <>
+      {/* Mobile Toggle */}
       <Button
         variant="ghost"
         size="icon"
@@ -31,6 +52,7 @@ export function WarehouseSidebar() {
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </Button>
 
+      {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 lg:z-auto transition-transform lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -39,20 +61,23 @@ export function WarehouseSidebar() {
       >
         <div className="p-6 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
           <h1 className="text-2xl font-bold text-white">SCM</h1>
-          <p className="text-sm text-white/70">Warehouse Portal</p>
+          <p className="text-sm text-white/70">Warehouse Manager</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
           {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-[#018790] transition-colors"
-              onClick={() => setIsOpen(false)}
+            <button
+              key={item.id}
+              onClick={() => handleNavClick(item.id)}
+              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                activeTab === item.id
+                  ? "bg-white/20 text-white"
+                  : "text-white/80 hover:bg-white/10"
+              }`}
             >
-              <item.icon size={20} />
+              <span className="text-lg">{item.icon}</span>
               <span className="text-sm font-medium">{item.label}</span>
-            </Link>
+            </button>
           ))}
         </nav>
 
@@ -68,6 +93,7 @@ export function WarehouseSidebar() {
         </div>
       </aside>
 
+      {/* Mobile Overlay */}
       {isOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setIsOpen(false)} />}
     </>
   )

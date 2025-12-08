@@ -1,4 +1,5 @@
 import { ManufacturerSidebar } from "@/components/manufacturer-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { KPICards } from "@/components/kpi-cards"
 import { ProductionStatusTable } from "@/components/production-status-table"
 import { MaterialSourcingPanel } from "@/components/material-sourcing-panel"
@@ -15,8 +16,10 @@ export default function ManufacturerDashboard() {
       <ManufacturerSidebar />
 
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
-          <div className="mb-8">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
               Manufacturer Dashboard
             </h1>

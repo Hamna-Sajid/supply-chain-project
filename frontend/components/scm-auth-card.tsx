@@ -97,13 +97,13 @@ export function SCMAuthCard() {
 
       // Redirect based on role
       const dashboards: Record<string, string> = {
-        supplier: "/supplier/dashboard",
-        manufacturer: "/manufacturer/dashboard",
-        warehouse_manager: "/warehouse/dashboard",
-        retailer: "/retailer/dashboard",
+        supplier: "/supplier",
+        manufacturer: "/manufacturer",
+        warehouse_manager: "/warehouse",
+        retailer: "/retailer",
       }
 
-      const redirectUrl = dashboards[data.user.role] || "/supplier/dashboard"
+      const redirectUrl = dashboards[data.user.role] || "/supplier"
       router.push(redirectUrl)
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "An error occurred")

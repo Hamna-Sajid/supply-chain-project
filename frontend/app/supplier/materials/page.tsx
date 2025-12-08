@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { SupplierSidebar } from "@/components/supplier-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -113,8 +114,10 @@ export default function MaterialsCatalogPage() {
     <div className="flex">
       <SupplierSidebar />
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
-          <div className="mb-8">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
               Materials Catalog
             </h1>
@@ -212,7 +215,7 @@ export default function MaterialsCatalogPage() {
                     </thead>
                     <tbody>
                       {materials.map((material) => (
-                        <tr key={material.id} className="border-b hover:bg-gray-50">
+                        <tr key={material.material_id} className="border-b hover:bg-gray-50">
                           <td className="py-3 px-4 font-medium">{material.material_id}</td>
                           <td className="py-3 px-4">{material.material_name}</td>
                           <td className="py-3 px-4">{material.quantity_available} units</td>

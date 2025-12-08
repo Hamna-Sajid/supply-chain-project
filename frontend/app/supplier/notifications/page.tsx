@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { SupplierSidebar } from "@/components/supplier-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
@@ -64,8 +65,10 @@ export default function NotificationsPage() {
     <div className="flex">
       <SupplierSidebar />
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
-          <div className="mb-8">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
               Notifications
             </h1>
