@@ -3,6 +3,41 @@ const router = express.Router();
 const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
+// Map frontend status values to valid database status values
+// Try multiple format possibilities since we don't know the exact constraint
+const statusMapping = {
+  // Try lowercase
+  'pending': 'pending',
+  'paid': 'paid',
+  'unpaid': 'unpaid',
+  'failed': 'failed',
+  // Try uppercase
+  'PENDING': 'PENDING',
+  'PAID': 'PAID',
+  'UNPAID': 'UNPAID',
+  'FAILED': 'FAILED',
+  // Try single letters
+  'p': 'pending',
+  'P': 'pending',
+  // Fallback mappings
+  'completed': 'paid',
+  'partial': 'unpaid',
+  'active': 'pending',
+  'inactive': 'failed'
+};
+
+const getValidStatus = (status) => {
+  if (!status) return 'pending';
+  const mapped = statusMapping[status];
+  if (mapped) {
+    console.log('Status mapping:', status, '->', mapped);
+    return mapped;
+  }
+  // If no mapping found, return as-is and let database validate
+  console.log('No mapping found for status:', status, 'using as-is');
+  return status.toLowerCase();
+};
+
 // Custom middleware to handle case-insensitive role checking
 const checkManufacturerRole = (req, res, next) => {
   if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('manufacturer')) {
@@ -137,23 +172,29 @@ router.get('/products', authenticateToken, checkManufacturerRole, async (req, re
 
 // Create product
 router.post('/products', authenticateToken, checkManufacturerRole, async (req, res) => {
-  const { product_name, sku, production_stage, quantity } = req.body;
+  const { product_name, production_stage } = req.body;
+
+  console.log('Creating product - name:', product_name, 'stage:', production_stage, 'userId:', req.user.userId);
 
   try {
     const { data, error } = await supabase
       .from('products')
       .insert([{
         product_name,
-        sku,
         production_stage,
-        quantity,
-        manufacturer_id: req.user.userId
+        manufacturer_id: req.user.userId,
+        cost_price: 0,
+        selling_price: 0
       }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
 
+    console.log('Product created:', data);
     res.status(201).json(data);
   } catch (error) {
     console.error('Create product error:', error);
@@ -304,35 +345,58 @@ router.get('/shipments', authenticateToken, checkManufacturerRole, async (req, r
 router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { supplier_id, items } = req.body;
 
+  console.log('Place order request:', { supplier_id, items, userId: req.user.userId });
+
   try {
+    if (!supplier_id || !items || items.length === 0) {
+      return res.status(400).json({ error: 'supplier_id and items are required' });
+    }
+
     // Create order
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert([{
         ordered_by: req.user.userId,
         delivered_by: supplier_id,
-        order_status: 'pending'
+        order_status: 'pending',
+        order_date: new Date().toISOString()
       }])
       .select()
       .single();
 
-    if (orderError) throw orderError;
+    if (orderError) {
+      console.error('Order creation error:', orderError);
+      throw orderError;
+    }
 
-    // Add order items
+    console.log('Order created:', orderData);
+
+    // Add order items - try using material_id column if product_id doesn't work
     for (const item of items) {
+      console.log('Adding item to order:', { order_id: orderData.order_id, item });
+      
+      // First, try to use material_id directly
       const { error: itemError } = await supabase
         .from('order_items')
         .insert([{
           order_id: orderData.order_id,
-          product_id: item.material_id,
+          material_id: item.material_id,
           quantity: item.quantity,
           unit_price: item.unit_price
         }]);
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error('Item insertion error:', itemError);
+        console.error('Item data attempted:', { order_id: orderData.order_id, material_id: item.material_id, quantity: item.quantity, unit_price: item.unit_price });
+        throw itemError;
+      }
     }
 
-    res.status(201).json(orderData);
+    console.log('Order completed successfully');
+    res.status(201).json({ 
+      message: 'Order placed successfully',
+      order: orderData 
+    });
   } catch (error) {
     console.error('Place order error:', error);
     res.status(500).json({ error: error.message || 'Failed to place order' });
@@ -345,16 +409,53 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
     const { data, error } = await supabase
       .from('orders')
       .select(`
-        *,
+        order_id,
+        order_date,
+        order_status,
+        total_amount,
         users!orders_delivered_by_fkey(name),
-        order_items(*)
+        order_items(
+          product_id,
+          quantity,
+          unit_price,
+          products(product_name)
+        )
       `)
       .eq('ordered_by', req.user.userId)
-      .order('created_at', { ascending: false });
+      .order('order_date', { ascending: false });
 
     if (error) throw error;
 
-    res.json({ orders: data || [] });
+    // Use total_amount from database, fallback to calculated total from order_items
+    const ordersFormatted = (data || []).map(order => {
+      let total = order.total_amount || 0;
+      
+      // If total_amount is 0, calculate from order_items
+      if (total === 0 && order.order_items && order.order_items.length > 0) {
+        total = (order.order_items || []).reduce((sum, item) => {
+          return sum + (item.quantity * item.unit_price);
+        }, 0);
+      }
+      
+      // Format order items with product and material names
+      const formattedItems = (order.order_items || []).map(item => ({
+        product_id: item.product_id,
+        product_name: item.products?.product_name || 'Unknown Product',
+        quantity: item.quantity,
+        unit_price: item.unit_price
+      }));
+      
+      return {
+        order_id: order.order_id,
+        order_date: order.order_date,
+        order_status: order.order_status,
+        supplier: order.users?.name || 'Unknown',
+        order_items: formattedItems,
+        total_amount: total
+      };
+    });
+
+    res.json({ orders: ordersFormatted });
   } catch (error) {
     console.error('Get orders error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -394,6 +495,149 @@ router.get('/analytics', authenticateToken, checkManufacturerRole, async (req, r
   } catch (error) {
     console.error('Analytics error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get manufacturer payment status for orders
+router.get('/payments', authenticateToken, checkManufacturerRole, async (req, res) => {
+  try {
+    // First, get all orders for this manufacturer
+    const { data: orders, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        order_id,
+        order_date,
+        order_status,
+        total_amount,
+        users!orders_delivered_by_fkey(name)
+      `)
+      .eq('ordered_by', req.user.userId)
+      .order('order_date', { ascending: false });
+
+    if (orderError) {
+      console.error('Order fetch error:', orderError);
+      throw orderError;
+    }
+
+    // Then, try to get payments (if payment table exists and has data)
+    const { data: payments, error: paymentError } = await supabase
+      .from('payment')
+      .select('*')
+      .in('order_id', (orders || []).map(o => o.order_id));
+
+    console.log('Payments fetched:', payments);
+    console.log('Payment error:', paymentError);
+
+    // Create a map of payments by order_id for quick lookup
+    const paymentMap = {};
+    if (payments) {
+      payments.forEach(p => {
+        if (!paymentMap[p.order_id]) {
+          paymentMap[p.order_id] = p;
+        }
+      });
+    }
+
+    // Format payments with order details
+    const paymentData = (orders || []).map(order => ({
+      order_id: order.order_id,
+      supplier: order.users?.name || 'Unknown',
+      order_date: order.order_date,
+      order_status: order.order_status,
+      order_total: order.total_amount,
+      payment: paymentMap[order.order_id] ? {
+        payment_id: paymentMap[order.order_id].payment_id,
+        payment_date: paymentMap[order.order_id].payment_date,
+        payment_status: paymentMap[order.order_id].status || 'pending',
+        payment_amount: paymentMap[order.order_id].payment_amount || paymentMap[order.order_id].amount || order.total_amount || 0
+      } : {
+        payment_id: null,
+        payment_date: null,
+        payment_status: 'pending',
+        payment_amount: order.total_amount || 0
+      }
+    }));
+
+    res.json({ payments: paymentData });
+  } catch (error) {
+    console.error('Get manufacturer payments error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// Update payment status for manufacturer
+router.put('/payments/:payment_id/status', authenticateToken, checkManufacturerRole, async (req, res) => {
+  const { payment_id } = req.params;
+  const { payment_status, order_id } = req.body;
+
+  const validStatus = getValidStatus(payment_status);
+  console.log('Update payment request - payment_id:', payment_id, 'payment_status:', payment_status, 'validStatus:', validStatus, 'order_id:', order_id);
+
+  try {
+    // If payment_id is null or 'null', we need to create a new payment
+    if (!payment_id || payment_id === 'null') {
+      if (!order_id) {
+        return res.status(400).json({ error: 'order_id required for new payments' });
+      }
+
+      // Fetch the order to get the total amount
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('order_id', order_id)
+        .single();
+
+      if (orderError || !orderData) {
+        console.error('Error fetching order:', orderError);
+        return res.status(400).json({ error: 'Order not found' });
+      }
+
+      const paymentAmount = orderData.total_amount || 0;
+      console.log('Creating new payment with status:', validStatus, 'amount:', paymentAmount);
+      const { data, error } = await supabase
+        .from('payment')
+        .insert([{
+          order_id,
+          status: validStatus,
+          payment_date: new Date().toISOString(),
+          amount: paymentAmount,
+          user_id: req.user.userId
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Create payment error:', error);
+        throw error;
+      }
+
+      return res.status(201).json(data);
+    }
+
+    // Otherwise, update existing payment
+    const { data, error } = await supabase
+      .from('payment')
+      .update({ status: validStatus })
+      .eq('payment_id', payment_id)
+      .select()
+      .single();
+
+    console.log('Update response - data:', data);
+    console.log('Update response - error:', error);
+
+    if (error) {
+      console.error('Update payment error:', error);
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Update manufacturer payment error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
   }
 });
 

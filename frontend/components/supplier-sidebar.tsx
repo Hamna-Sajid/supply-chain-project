@@ -3,13 +3,14 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, Home, Package, Truck, DollarSign, Star, Bell, LogOut } from "lucide-react"
+import { Menu, X, Home, Package, Truck, DollarSign, CreditCard, Star, Bell, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
   { label: "Dashboard", href: "/supplier/dashboard", icon: Home },
   { label: "Materials Catalog", href: "/supplier/materials", icon: Package },
   { label: "Manufacturer Orders", href: "/supplier/orders", icon: Truck },
+  { label: "Payments", href: "/supplier/payments", icon: CreditCard },
   { label: "Financials", href: "/supplier/financials", icon: DollarSign },
   { label: "Ratings & Reviews", href: "/supplier/ratings", icon: Star },
   { label: "Notifications", href: "/supplier/notifications", icon: Bell },

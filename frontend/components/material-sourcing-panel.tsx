@@ -26,6 +26,9 @@ export function MaterialSourcingPanel() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null)
+  const [orderQuantity, setOrderQuantity] = useState("")
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchMaterials = async () => {
@@ -71,6 +74,57 @@ export function MaterialSourcingPanel() {
 
     return matchesSearch
   })
+
+  const handlePlaceOrder = (material: RawMaterial) => {
+    setSelectedMaterial(material)
+    setOrderQuantity("")
+    setIsOrderModalOpen(true)
+  }
+
+  const handleSubmitOrder = async () => {
+    if (!selectedMaterial || !orderQuantity) {
+      setError("Please enter a quantity")
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        setError("Authentication required")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/orders`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          supplier_id: selectedMaterial.supplier_id,
+          items: [
+            {
+              material_id: selectedMaterial.material_id,
+              quantity: parseInt(orderQuantity),
+              unit_price: selectedMaterial.unit_price,
+            }
+          ],
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to place order: ${response.status}`)
+      }
+
+      setError(null)
+      setIsOrderModalOpen(false)
+      setSelectedMaterial(null)
+      setOrderQuantity("")
+      // Optionally refresh materials or show success message
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to place order")
+    }
+  }
 
   const itemsPerPage = 5
   const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage)
@@ -130,7 +184,11 @@ export function MaterialSourcingPanel() {
                       <td className="py-3 px-4">${material.unit_price?.toFixed(2)}</td>
                       <td className="py-3 px-4">{material.quantity_available}</td>
                       <td className="py-3 px-4">
-                        <Button size="sm" style={{ backgroundColor: "#018790", color: "white" }}>
+                        <Button 
+                          size="sm" 
+                          style={{ backgroundColor: "#018790", color: "white" }}
+                          onClick={() => handlePlaceOrder(material)}
+                        >
                           Place Order
                         </Button>
                       </td>
@@ -181,6 +239,76 @@ export function MaterialSourcingPanel() {
               </div>
             )}
           </>
+        )}
+
+        {/* Order Modal */}
+        {isOrderModalOpen && selectedMaterial && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md border-0 shadow-lg">
+              <CardHeader className="border-b pb-4">
+                <CardTitle className="text-lg">Place Order</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Material</label>
+                  <p className="mt-1 text-gray-900 font-semibold">{selectedMaterial.material_name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Supplier</label>
+                  <p className="mt-1 text-gray-900">{selectedMaterial.supplier_name || "Unknown"}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Unit Price</label>
+                  <p className="mt-1 text-gray-900">${selectedMaterial.unit_price?.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Available Quantity</label>
+                  <p className="mt-1 text-gray-900">{selectedMaterial.quantity_available} units</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Order Quantity</label>
+                  <Input
+                    type="number"
+                    placeholder="Enter quantity"
+                    value={orderQuantity}
+                    onChange={(e) => setOrderQuantity(e.target.value)}
+                    min="1"
+                    max={selectedMaterial.quantity_available}
+                    className="mt-1"
+                  />
+                </div>
+                {orderQuantity && (
+                  <div className="bg-gray-50 p-3 rounded">
+                    <p className="text-sm text-gray-600">Total Cost:</p>
+                    <p className="text-xl font-bold text-gray-900">
+                      ${(parseInt(orderQuantity) * selectedMaterial.unit_price).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setIsOrderModalOpen(false)
+                      setSelectedMaterial(null)
+                      setOrderQuantity("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 text-white"
+                    style={{ backgroundColor: "#018790" }}
+                    onClick={handleSubmitOrder}
+                    disabled={!orderQuantity}
+                  >
+                    Place Order
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, LayoutDashboard, ShoppingBag, Factory, Package, Truck, BarChart3, LogOut } from "lucide-react"
+import { Menu, X, LayoutDashboard, ShoppingBag, Factory, Package, Truck, BarChart3, CreditCard, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { label: "Product Management", href: "/manufacturer/product-management", icon: Factory },
   { label: "Finished Goods Inventory", href: "/manufacturer/inventory", icon: Package },
   { label: "Warehouse Shipments", href: "/manufacturer/shipments", icon: Truck },
+  { label: "Payments", href: "/manufacturer/payments", icon: CreditCard },
   { label: "Financials & Analytics", href: "/manufacturer/analytics", icon: BarChart3 },
 ]
 

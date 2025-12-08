@@ -23,14 +23,13 @@ interface Expense {
   amount: number
   category: string
   date: string
-  description: string
 }
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState("revenue")
   const [revenue, setRevenue] = useState<RevenueTransaction[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
-  const [newExpense, setNewExpense] = useState({ amount: "", category: "", description: "" })
+  const [newExpense, setNewExpense] = useState({ amount: "", category: "" })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -51,6 +50,8 @@ export default function FinancialsPage() {
         if (revenueRes.ok) {
           const data = await revenueRes.json()
           setRevenue(data.revenue || [])
+        } else {
+          console.error('Revenue fetch failed:', revenueRes.status)
         }
 
         // Fetch expenses
@@ -60,9 +61,14 @@ export default function FinancialsPage() {
         if (expenseRes.ok) {
           const data = await expenseRes.json()
           setExpenses(data.expenses || [])
+        } else {
+          const errorData = await expenseRes.text()
+          console.error('Expense fetch failed:', expenseRes.status, errorData)
+          setError(`Failed to load expenses: ${expenseRes.status}`)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load financial data")
+        console.error('Fetch error:', err)
       } finally {
         setLoading(false)
       }
@@ -76,6 +82,14 @@ export default function FinancialsPage() {
 
   const handleAddExpense = async () => {
     if (newExpense.amount && newExpense.category) {
+      const amount = Number.parseFloat(newExpense.amount)
+      
+      // Validate amount is within database constraints (numeric(5,2) allows up to 999.99)
+      if (amount > 999.99) {
+        setError("Expense amount must be less than $1000")
+        return
+      }
+      
       try {
         const token = localStorage.getItem("token")
         const response = await fetch(`${API_URL}/supplier/expenses`, {
@@ -85,16 +99,19 @@ export default function FinancialsPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            amount: Number.parseFloat(newExpense.amount),
+            amount,
             category: newExpense.category,
-            description: newExpense.description,
           }),
         })
 
         if (response.ok) {
           const newExp = await response.json()
           setExpenses([...expenses, newExp])
-          setNewExpense({ amount: "", category: "", description: "" })
+          setNewExpense({ amount: "", category: "" })
+          setError("") // Clear any previous errors
+        } else {
+          const errorData = await response.json()
+          setError(errorData.error || "Failed to add expense")
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to add expense")
@@ -230,10 +247,6 @@ export default function FinancialsPage() {
                           <option value="Transportation">Transportation</option>
                           <option value="Other">Other</option>
                         </select>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Description</label>
-                        <textarea placeholder="Brief description" value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })} className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm" rows={3} />
                       </div>
                       <Button onClick={handleAddExpense} className="w-full text-white" style={{ backgroundColor: "#018790" }}>Add Expense</Button>
                     </CardContent>

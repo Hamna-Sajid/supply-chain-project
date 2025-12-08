@@ -11,9 +11,7 @@ import { Plus, Trash2 } from "lucide-react"
 interface Product {
   product_id: string
   product_name: string
-  sku: string
   production_stage: string
-  quantity: number
   created_at?: string
 }
 
@@ -23,7 +21,7 @@ export default function ProductManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ name: "", sku: "", stage: "Design", quantity: "" })
+  const [formData, setFormData] = useState({ name: "", stage: "planning" })
 
   // Fetch products on component load
   useEffect(() => {
@@ -56,7 +54,7 @@ export default function ProductManagement() {
   }
 
   const handleAddProduct = async () => {
-    if (!formData.name || !formData.sku || !formData.quantity) {
+    if (!formData.name) {
       setError("Please fill in all fields")
       return
     }
@@ -72,17 +70,17 @@ export default function ProductManagement() {
         },
         body: JSON.stringify({
           product_name: formData.name,
-          sku: formData.sku,
           production_stage: formData.stage,
-          quantity: Number.parseInt(formData.quantity),
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create product")
+        const errorText = await response.text()
+        console.error("API error response:", response.status, errorText)
+        throw new Error(`Failed to create product: ${response.status} - ${errorText}`)
       }
 
-      setFormData({ name: "", sku: "", stage: "Design", quantity: "" })
+      setFormData({ name: "", stage: "planning" })
       setShowForm(false)
       setError(null)
       await fetchProducts()
@@ -163,35 +161,17 @@ export default function ProductManagement() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">SKU</label>
-                    <Input
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      placeholder="Enter SKU"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium mb-2">Stage</label>
                     <select
                       value={formData.stage}
                       onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
                       className="w-full px-3 py-2 border rounded-lg"
                     >
-                      <option>Design</option>
-                      <option>Manufacturing</option>
-                      <option>Quality Check</option>
-                      <option>Packaging</option>
-                      <option>Ready</option>
+                      <option value="planning">Planning</option>
+                      <option value="production">Production</option>
+                      <option value="quality_check">Quality Check</option>
+                      <option value="completed">Completed</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Quantity</label>
-                    <Input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                      placeholder="Enter quantity"
-                    />
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end">
@@ -229,13 +209,7 @@ export default function ProductManagement() {
                           Product Name
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                          SKU
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Production Stage
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                          Quantity
                         </th>
                         <th className="text-center py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Action
@@ -246,7 +220,6 @@ export default function ProductManagement() {
                       {products_state.map((product) => (
                         <tr key={product.product_id} className="border-b hover:bg-gray-100 transition-colors">
                           <td className="py-3 px-4 font-medium">{product.product_name}</td>
-                          <td className="py-3 px-4">{product.sku}</td>
                           <td className="py-3 px-4">
                             <span
                               className="px-3 py-1 rounded-full text-xs font-medium text-white"
@@ -255,7 +228,6 @@ export default function ProductManagement() {
                               {product.production_stage}
                             </span>
                           </td>
-                          <td className="py-3 px-4">{product.quantity} units</td>
                           <td className="py-3 px-4 text-center">
                             <Button
                               size="sm"
