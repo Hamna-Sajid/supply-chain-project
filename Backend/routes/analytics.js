@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const pool = require('../../config/database');
+const { authenticateToken } = require('../../middleware/auth');
 
 // Get analytics for current user
 router.get('/dashboard', authenticateToken, async (req, res) => {

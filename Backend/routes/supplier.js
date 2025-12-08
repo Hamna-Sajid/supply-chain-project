@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const pool = require('../../config/database');
+const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
 // Add raw material
 router.post('/materials', authenticateToken, authorizeRole('supplier'), async (req, res) => {
