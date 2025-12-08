@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ManufacturerSidebar } from "@/components/manufacturer-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -124,8 +125,10 @@ export default function ProductManagement() {
       <ManufacturerSidebar />
 
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
-          <div className="mb-8 flex justify-between items-center">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 flex justify-between items-center pr-48">
             <div>
               <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
                 Product Management

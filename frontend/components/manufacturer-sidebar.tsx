@@ -72,7 +72,7 @@ export function ManufacturerSidebar() {
         <div className="p-4 border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
           <Button
             onClick={handleLogout}
-            className="w-full text-white border-white/20 hover:bg-red-600 bg-transparent border flex items-center gap-2"
+            className="w-full text-white border-white/20 hover:bg-white/10 bg-transparent border flex items-center gap-2"
           >
             <LogOut size={18} />
             Logout

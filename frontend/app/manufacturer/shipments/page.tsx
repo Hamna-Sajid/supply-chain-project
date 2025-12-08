@@ -1,6 +1,7 @@
 "use client"
 
 import { ManufacturerSidebar } from "@/components/manufacturer-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Truck, CheckCircle, Clock } from "lucide-react"
@@ -100,8 +101,10 @@ export default function WarehouseShipments() {
       <ManufacturerSidebar />
 
       <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
-        <div className="p-6 lg:p-8">
-          <div className="mb-8">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 pr-48">
             <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
               Warehouse Shipments
             </h1>
