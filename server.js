@@ -19,12 +19,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Serve static files from Frontend-html directory
-app.use(express.static(path.join(__dirname, 'Frontend-html')));
-
-// Serve Backend/logic files as static
-app.use('/logic', express.static(path.join(__dirname, 'Backend/logic')));
-
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/supplier', supplierRoutes);
@@ -41,11 +35,6 @@ app.get('/api/health', (req, res) => {
     message: 'Supply Chain Management API is running',
     timestamp: new Date().toISOString()
   });
-});
-
-// Serve index.html for root route
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'Frontend-html', 'index.html'));
 });
 
 // Error handling middleware

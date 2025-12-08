@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 
 interface PasswordStrength {
   score: number
@@ -18,11 +19,18 @@ interface PasswordStrength {
   color: string
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+
 export function SCMAuthCard() {
+  // Router
+  const router = useRouter()
+
   // Login state
   const [loginEmail, setLoginEmail] = useState("")
   const [loginPassword, setLoginPassword] = useState("")
   const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [loginError, setLoginError] = useState("")
+  const [loginLoading, setLoginLoading] = useState(false)
 
   // Sign up state
   const [signupName, setSignupName] = useState("")
@@ -32,6 +40,9 @@ export function SCMAuthCard() {
   const [signupRole, setSignupRole] = useState("")
   const [signupContact, setSignupContact] = useState("")
   const [signupAddress, setSignupAddress] = useState("")
+  const [signupError, setSignupError] = useState("")
+  const [signupSuccess, setSignupSuccess] = useState(false)
+  const [signupLoading, setSignupLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
 
   // Calculate password strength
@@ -57,23 +68,106 @@ export function SCMAuthCard() {
 
   const passwordStrength = calculatePasswordStrength(signupPassword)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Login:", { loginEmail, loginPassword })
-    // Handle login logic
+    setLoginError("")
+    setLoginLoading(true)
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed")
+      }
+
+      // Store token and user data
+      localStorage.setItem("token", data.token)
+      localStorage.setItem("user", JSON.stringify(data.user))
+
+      // Redirect based on role
+      const dashboards: Record<string, string> = {
+        supplier: "/supplier/dashboard",
+        manufacturer: "/manufacturer/dashboard",
+        warehouse_manager: "/warehouse/dashboard",
+        retailer: "/retailer/dashboard",
+      }
+
+      const redirectUrl = dashboards[data.user.role] || "/supplier/dashboard"
+      router.push(redirectUrl)
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "An error occurred")
+    } finally {
+      setLoginLoading(false)
+    }
   }
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Sign up:", {
-      signupName,
-      signupEmail,
-      signupPassword,
-      signupRole,
-      signupContact,
-      signupAddress,
-    })
-    // Handle signup logic
+    setSignupError("")
+    setSignupLoading(true)
+
+    try {
+      // Validate password strength
+      if (passwordStrength.score < 2) {
+        throw new Error("Password is too weak. Please use a stronger password.")
+      }
+
+      // Validate role is selected
+      if (!signupRole) {
+        throw new Error("Please select a role")
+      }
+
+      const response = await fetch(`${API_URL}/auth/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: signupName,
+          email: signupEmail,
+          password: signupPassword,
+          role: signupRole.replace("-", "_"),
+          contact_number: signupContact,
+          address: signupAddress,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Signup failed")
+      }
+
+      setSignupSuccess(true)
+      // Clear form
+      setSignupName("")
+      setSignupEmail("")
+      setSignupPassword("")
+      setSignupRole("")
+      setSignupContact("")
+      setSignupAddress("")
+
+      // Switch to login tab after success
+      setTimeout(() => {
+        setActiveTab("login")
+        setSignupSuccess(false)
+      }, 2000)
+    } catch (error) {
+      setSignupError(error instanceof Error ? error.message : "An error occurred")
+    } finally {
+      setSignupLoading(false)
+    }
   }
 
   return (
@@ -132,6 +226,13 @@ export function SCMAuthCard() {
                   <p className="text-sm text-gray-600">Log in to your SCM account</p>
                 </div>
 
+                {loginError && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-red-50 border border-red-200">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <p className="text-sm text-red-600">{loginError}</p>
+                  </div>
+                )}
+
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="login-email" style={{ color: "#005461" }} className="font-medium text-sm">
@@ -143,6 +244,7 @@ export function SCMAuthCard() {
                       placeholder="you@example.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      disabled={loginLoading}
                       required
                       className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] h-11"
                     />
@@ -159,6 +261,7 @@ export function SCMAuthCard() {
                         placeholder="Enter your password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
+                        disabled={loginLoading}
                         required
                         className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] pr-10 h-11"
                       />
@@ -167,6 +270,7 @@ export function SCMAuthCard() {
                         onClick={() => setShowLoginPassword(!showLoginPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                        disabled={loginLoading}
                       >
                         {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -175,10 +279,18 @@ export function SCMAuthCard() {
 
                   <Button
                     type="submit"
+                    disabled={loginLoading}
                     className="w-full font-medium text-white h-11 text-base"
                     style={{ backgroundColor: "#018790" }}
                   >
-                    Log In
+                    {loginLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      "Log In"
+                    )}
                   </Button>
                 </form>
 
@@ -205,6 +317,20 @@ export function SCMAuthCard() {
                   <p className="text-sm text-gray-600">Join the SCM platform</p>
                 </div>
 
+                {signupSuccess && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 border border-green-200">
+                    <AlertCircle className="w-4 h-4 text-green-600" />
+                    <p className="text-sm text-green-600">Account created successfully! Redirecting to login...</p>
+                  </div>
+                )}
+
+                {signupError && (
+                  <div className="flex items-center gap-2 p-3 rounded-md bg-red-50 border border-red-200">
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <p className="text-sm text-red-600">{signupError}</p>
+                  </div>
+                )}
+
                 <form onSubmit={handleSignup} className="space-y-5 max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name" style={{ color: "#005461" }} className="font-medium text-sm">
@@ -216,6 +342,7 @@ export function SCMAuthCard() {
                       placeholder="John Doe"
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
+                      disabled={signupLoading}
                       required
                       className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] h-11"
                     />
@@ -231,6 +358,7 @@ export function SCMAuthCard() {
                       placeholder="you@example.com"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
+                      disabled={signupLoading}
                       required
                       className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] h-11"
                     />
@@ -247,6 +375,7 @@ export function SCMAuthCard() {
                         placeholder="Min. 8 characters"
                         value={signupPassword}
                         onChange={(e) => setSignupPassword(e.target.value)}
+                        disabled={signupLoading}
                         required
                         className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] pr-10 h-11"
                       />
@@ -255,6 +384,7 @@ export function SCMAuthCard() {
                         onClick={() => setShowSignupPassword(!showSignupPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                         aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                        disabled={signupLoading}
                       >
                         {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -291,7 +421,7 @@ export function SCMAuthCard() {
                     <Label htmlFor="signup-role" style={{ color: "#005461" }} className="font-medium text-sm">
                       Select Your Role <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={signupRole} onValueChange={setSignupRole}>
+                    <Select value={signupRole} onValueChange={setSignupRole} disabled={signupLoading}>
                       <SelectTrigger
                         id="signup-role"
                         className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] h-11"
@@ -318,6 +448,7 @@ export function SCMAuthCard() {
                       placeholder="+1 (555) 000-0000"
                       value={signupContact}
                       onChange={(e) => setSignupContact(e.target.value)}
+                      disabled={signupLoading}
                       required
                       className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] h-11"
                     />
@@ -332,6 +463,7 @@ export function SCMAuthCard() {
                       placeholder="Street address, city, state, ZIP code"
                       value={signupAddress}
                       onChange={(e) => setSignupAddress(e.target.value)}
+                      disabled={signupLoading}
                       required
                       className="border border-gray-200 focus:border-[#018790] focus:ring-[#018790] min-h-20 resize-none"
                     />
@@ -339,10 +471,20 @@ export function SCMAuthCard() {
 
                   <Button
                     type="submit"
+                    disabled={signupLoading || signupSuccess}
                     className="w-full font-medium text-white h-11 text-base"
                     style={{ backgroundColor: "#018790" }}
                   >
-                    Sign Up
+                    {signupLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : signupSuccess ? (
+                      "Account created!"
+                    ) : (
+                      "Sign Up"
+                    )}
                   </Button>
                 </form>
 
