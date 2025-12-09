@@ -56,7 +56,7 @@ router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async
   try {
     const { data, error } = await supabase
       .from('shipments')
-      .update({ status: 'accepted' })
+      .update({ status: 'delivered' })
       .eq('shipment_id', id)
       .eq('whm_id', req.user.userId)
       .select()
@@ -68,7 +68,7 @@ router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    res.json({ message: 'Shipment accepted' });
+    res.json({ message: 'Shipment accepted and marked as delivered' });
   } catch (error) {
     console.error('Accept shipment error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -80,21 +80,15 @@ router.put('/shipments/:id/reject', authenticateToken, checkWarehouseRole, async
   const { id } = req.params;
 
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('shipments')
-      .update({ status: 'rejected' })
+      .delete()
       .eq('shipment_id', id)
-      .eq('whm_id', req.user.userId)
-      .select()
-      .single();
+      .eq('whm_id', req.user.userId);
 
     if (error) throw error;
 
-    if (!data) {
-      return res.status(404).json({ error: 'Shipment not found' });
-    }
-
-    res.json({ message: 'Shipment rejected' });
+    res.json({ message: 'Shipment rejected and deleted' });
   } catch (error) {
     console.error('Reject shipment error:', error);
     res.status(500).json({ error: 'Server error' });
