@@ -102,7 +102,7 @@ router.get('/products', authenticateToken, checkRetailerRole, async (req, res) =
       .select(`
         product_id,
         quantity_available,
-        products(product_id, product_name, category, selling_price)
+        products(product_id, product_name, category, sku, selling_price)
       `)
       .gt('quantity_available', 0)
       .order('products(product_name)', { ascending: true });
@@ -114,7 +114,7 @@ router.get('/products', authenticateToken, checkRetailerRole, async (req, res) =
       product_id: item.product_id,
       product_name: item.products?.product_name || 'Unknown',
       category: item.products?.category || '',
-      sku: item.product_id || '',
+      sku: item.products?.sku || '',
       quantity: item.quantity_available,
       price: item.products?.selling_price || 0
     }));
@@ -347,11 +347,6 @@ router.post('/sales', authenticateToken, checkRetailerRole, async (req, res) => 
   const { items, saleNote } = req.body;
 
   try {
-    // Validate items have required fields
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'No items provided' });
-    }
-
     // Create sale
     const { data: saleData, error: saleError } = await supabase
       .from('sales')
@@ -362,28 +357,24 @@ router.post('/sales', authenticateToken, checkRetailerRole, async (req, res) => 
       .select()
       .single();
 
-    if (saleError) {
-      console.error('Sale creation error:', saleError);
-      throw saleError;
-    }
+    if (saleError) throw saleError;
 
     const saleId = saleData.sale_id;
 
     // Add sale items
-    const saleItems = items.map(item => ({
-      sale_id: saleId,
-      product_id: item.product_id || item.productId,
-      quantity: item.quantity,
-      price_per_unit: item.price || item.pricePerUnit || 0
-    }));
+    if (items && items.length > 0) {
+      const saleItems = items.map(item => ({
+        sale_id: saleId,
+        product_id: item.productId,
+        quantity: item.quantity,
+        price_per_unit: item.pricePerUnit
+      }));
 
-    const { error: itemsError } = await supabase
-      .from('sale_items')
-      .insert(saleItems);
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(saleItems);
 
-    if (itemsError) {
-      console.error('Sale items error:', itemsError);
-      throw itemsError;
+      if (itemsError) throw itemsError;
     }
 
     res.status(201).json({
@@ -392,13 +383,7 @@ router.post('/sales', authenticateToken, checkRetailerRole, async (req, res) => 
     });
   } catch (error) {
     console.error('Record sale error:', error);
-
-    // Provide more specific error message
-    if (error.message && error.message.includes('Inventory row not found')) {
-      res.status(400).json({ error: 'Product not available in inventory' });
-    } else {
-      res.status(500).json({ error: 'Server error', details: error.message });
-    }
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

@@ -11,16 +11,17 @@ import { Trash2, Edit2 } from "lucide-react"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
 interface Material {
-  id: string
+  material_id: string
   material_name: string
   description: string
-  quantity: number
-  price_per_unit: number
+  quantity_available: number
+  unit_price: number
   created_at: string
 }
 
 export default function MaterialsCatalogPage() {
   const [materials, setMaterials] = useState<Material[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -64,32 +65,78 @@ export default function MaterialsCatalogPage() {
     if (formData.name && formData.quantity && formData.unitPrice) {
       try {
         const token = localStorage.getItem("token")
-        const response = await fetch(`${API_URL}/supplier/materials`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            material_name: formData.name,
-            description: formData.description,
-            quantity_available: Number.parseInt(formData.quantity),
-            unit_price: Number.parseFloat(formData.unitPrice),
-          }),
-        })
+        
+        if (editingId) {
+          // Update existing material
+          const response = await fetch(`${API_URL}/supplier/materials/${editingId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              material_name: formData.name,
+              description: formData.description,
+              quantity_available: Number.parseInt(formData.quantity),
+              unit_price: Number.parseFloat(formData.unitPrice),
+            }),
+          })
 
-        if (response.ok) {
-          const newMaterial = await response.json()
-          setMaterials([...materials, newMaterial])
-          setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
+          if (response.ok) {
+            const updatedMaterial = await response.json()
+            setMaterials(materials.map((m) => (m.material_id === editingId ? updatedMaterial : m)))
+            setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
+            setEditingId(null)
+            setError("")
+          } else {
+            const errorData = await response.json()
+            setError(errorData.error || "Failed to update material")
+          }
         } else {
-          const errorData = await response.json()
-          setError(errorData.error || "Failed to add material")
+          // Create new material
+          const response = await fetch(`${API_URL}/supplier/materials`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              material_name: formData.name,
+              description: formData.description,
+              quantity_available: Number.parseInt(formData.quantity),
+              unit_price: Number.parseFloat(formData.unitPrice),
+            }),
+          })
+
+          if (response.ok) {
+            const newMaterial = await response.json()
+            setMaterials([...materials, newMaterial])
+            setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
+            setError("")
+          } else {
+            const errorData = await response.json()
+            setError(errorData.error || "Failed to add material")
+          }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to add material")
+        setError(err instanceof Error ? err.message : "Failed to save material")
       }
     }
+  }
+
+  const handleEdit = (material: Material) => {
+    setEditingId(material.material_id)
+    setFormData({
+      name: material.material_name,
+      description: material.description,
+      quantity: material.quantity_available.toString(),
+      unitPrice: material.unit_price.toString(),
+    })
+  }
+
+  const handleCancel = () => {
+    setEditingId(null)
+    setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
   }
 
   const handleDelete = async (id: string) => {
@@ -139,7 +186,9 @@ export default function MaterialsCatalogPage() {
             {/* Left Panel - Add New Material */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Add New Raw Material</CardTitle>
+                <CardTitle className="text-lg">
+                  {editingId ? "Edit Raw Material" : "Add New Raw Material"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -190,8 +239,17 @@ export default function MaterialsCatalogPage() {
                   className="w-full text-white"
                   style={{ backgroundColor: "#018790" }}
                 >
-                  Create Material
+                  {editingId ? "Update Material" : "Create Material"}
                 </Button>
+                {editingId && (
+                  <Button
+                    onClick={handleCancel}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -222,7 +280,12 @@ export default function MaterialsCatalogPage() {
                           <td className="py-3 px-4">${material.unit_price.toFixed(2)}</td>
                           <td className="py-3 px-4 text-gray-600">{new Date(material.created_at).toLocaleDateString()}</td>
                           <td className="py-3 px-4 flex gap-2">
-                            <Button size="sm" variant="outline" className="h-7 bg-transparent">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 bg-transparent"
+                              onClick={() => handleEdit(material)}
+                            >
                               <Edit2 size={14} />
                             </Button>
                             <Button

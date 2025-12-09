@@ -16,6 +16,7 @@ import {
 } from "recharts"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { SupplierSidebar } from "@/components/supplier-sidebar"
+import { SupplierPaymentsPanel } from "@/components/supplier-payments-panel"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
@@ -29,7 +30,7 @@ interface DashboardData {
 
 interface MaterialStock {
   material_name: string
-  quantity: number
+  quantity_available: number
 }
 
 interface PendingOrder {
@@ -78,9 +79,10 @@ export function SupplierDashboard() {
         })
         if (dashboardRes.ok) {
           const data = await dashboardRes.json()
+          console.log('Dashboard data received:', data)
           setDashboardData(data)
         } else {
-          console.error("Failed to fetch dashboard data")
+          console.error("Failed to fetch dashboard data", dashboardRes.status)
         }
 
         // Fetch material stock
@@ -219,7 +221,9 @@ export function SupplierDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-[#005461]">
-                  ${(dashboardData?.total_expenses || 0).toLocaleString()}
+                  ${typeof dashboardData?.total_expenses === 'number' 
+                    ? (dashboardData.total_expenses || 0).toLocaleString() 
+                    : (parseInt(dashboardData?.total_expenses) || 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-600 mt-2">All recorded expenses</p>
               </CardContent>
@@ -263,7 +267,7 @@ export function SupplierDashboard() {
                     <BarChart
                       data={materialStockData.map((m) => ({
                         name: m.material_name,
-                        quantity: m.quantity,
+                        quantity: m.quantity_available,
                       }))}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
@@ -369,6 +373,11 @@ export function SupplierDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Payment Status Section */}
+          <div className="mt-8">
+            <SupplierPaymentsPanel />
           </div>
         </div>
       </div>

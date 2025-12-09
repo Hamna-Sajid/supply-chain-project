@@ -6,15 +6,30 @@ import { WarehouseHeader } from "@/components/warehouse-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Edit2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface Product {
   product_id: string
   product_name: string
-  sku: string
   production_stage: string
-  quantity: number
   created_at?: string
+}
+
+const stageOptions = ["planning", "production", "quality_check", "completed"]
+
+const stageLabels: Record<string, string> = {
+  "planning": "Planning",
+  "production": "Production",
+  "quality_check": "Quality Check",
+  "completed": "Completed",
+}
+
+const stageColors: Record<string, string> = {
+  "planning": "bg-gray-100 text-gray-800",
+  "production": "bg-blue-100 text-blue-800",
+  "quality_check": "bg-yellow-100 text-yellow-800",
+  "completed": "bg-green-100 text-green-800",
 }
 
 export default function ProductManagement() {
@@ -23,7 +38,11 @@ export default function ProductManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ name: "", sku: "", stage: "Design", quantity: "" })
+  const [formData, setFormData] = useState({ name: "", stage: "planning" })
+  const [editingStageId, setEditingStageId] = useState<string | null>(null)
+  const [selectedStages, setSelectedStages] = useState<Record<string, string>>({})
+  const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null)
+  const [quantityValues, setQuantityValues] = useState<Record<string, number>>({})
 
   // Fetch products on component load
   useEffect(() => {
@@ -45,7 +64,15 @@ export default function ProductManagement() {
       }
 
       const data = await response.json()
-      setProducts(data.products || [])
+      const products = data.products || []
+      setProducts(products)
+      
+      // Initialize selected stages
+      const stages: Record<string, string> = {}
+      products.forEach((p: Product) => {
+        stages[p.product_id] = p.production_stage
+      })
+      setSelectedStages(stages)
       setError(null)
     } catch (err) {
       console.error("Error fetching products:", err)
@@ -56,7 +83,7 @@ export default function ProductManagement() {
   }
 
   const handleAddProduct = async () => {
-    if (!formData.name || !formData.sku || !formData.quantity) {
+    if (!formData.name) {
       setError("Please fill in all fields")
       return
     }
@@ -72,17 +99,17 @@ export default function ProductManagement() {
         },
         body: JSON.stringify({
           product_name: formData.name,
-          sku: formData.sku,
           production_stage: formData.stage,
-          quantity: Number.parseInt(formData.quantity),
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to create product")
+        const errorText = await response.text()
+        console.error("API error response:", response.status, errorText)
+        throw new Error(`Failed to create product: ${response.status} - ${errorText}`)
       }
 
-      setFormData({ name: "", sku: "", stage: "Design", quantity: "" })
+      setFormData({ name: "", stage: "planning" })
       setShowForm(false)
       setError(null)
       await fetchProducts()
@@ -91,6 +118,78 @@ export default function ProductManagement() {
       setError(err instanceof Error ? err.message : "Error creating product")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleUpdateStage = async (id: string) => {
+    const newStage = selectedStages[id]
+    if (!newStage) return
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products/${id}/stage`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          production_stage: newStage,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Failed to update stage: ${errorText}`)
+      }
+
+      // Update local state
+      setProducts(products_state.map(p => 
+        p.product_id === id 
+          ? { ...p, production_stage: newStage }
+          : p
+      ))
+      setEditingStageId(null)
+      setError(null)
+    } catch (err) {
+      console.error("Error updating stage:", err)
+      setError(err instanceof Error ? err.message : "Error updating stage")
+    }
+  }
+
+  const handleUpdateQuantity = async (id: string) => {
+    const quantity = quantityValues[id]
+    if (quantity === undefined || quantity < 0) {
+      setError("Please enter a valid quantity")
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products/${id}/quantity`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quantity: Number(quantity),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Failed to add quantity: ${errorText}`)
+      }
+
+      setEditingQuantityId(null)
+      setQuantityValues({ ...quantityValues, [id]: 0 })
+      setError(null)
+      // Refresh products to show any changes
+      await fetchProducts()
+    } catch (err) {
+      console.error("Error updating quantity:", err)
+      setError(err instanceof Error ? err.message : "Error adding quantity")
     }
   }
 
@@ -163,35 +262,17 @@ export default function ProductManagement() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">SKU</label>
-                    <Input
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      placeholder="Enter SKU"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium mb-2">Stage</label>
                     <select
                       value={formData.stage}
                       onChange={(e) => setFormData({ ...formData, stage: e.target.value })}
                       className="w-full px-3 py-2 border rounded-lg"
                     >
-                      <option>Design</option>
-                      <option>Manufacturing</option>
-                      <option>Quality Check</option>
-                      <option>Packaging</option>
-                      <option>Ready</option>
+                      <option value="planning">Planning</option>
+                      <option value="production">Production</option>
+                      <option value="quality_check">Quality Check</option>
+                      <option value="completed">Completed</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Quantity</label>
-                    <Input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                      placeholder="Enter quantity"
-                    />
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end">
@@ -229,9 +310,6 @@ export default function ProductManagement() {
                           Product Name
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                          SKU
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Production Stage
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
@@ -246,24 +324,110 @@ export default function ProductManagement() {
                       {products_state.map((product) => (
                         <tr key={product.product_id} className="border-b hover:bg-gray-100 transition-colors">
                           <td className="py-3 px-4 font-medium">{product.product_name}</td>
-                          <td className="py-3 px-4">{product.sku}</td>
                           <td className="py-3 px-4">
-                            <span
-                              className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                              style={{ backgroundColor: "#018790" }}
-                            >
-                              {product.production_stage}
-                            </span>
+                            <Badge className={stageColors[product.production_stage] || "bg-gray-100 text-gray-800"}>
+                              {stageLabels[product.production_stage] || product.production_stage}
+                            </Badge>
                           </td>
-                          <td className="py-3 px-4">{product.quantity} units</td>
-                          <td className="py-3 px-4 text-center">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteProduct(product.product_id)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
+                          <td className="py-3 px-4">
+                            {product.production_stage === "completed" ? (
+                              editingQuantityId === product.product_id ? (
+                                <div className="flex gap-2 items-center">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={quantityValues[product.product_id] || ""}
+                                    onChange={(e) => setQuantityValues({ ...quantityValues, [product.product_id]: parseInt(e.target.value) || 0 })}
+                                    placeholder="Enter quantity"
+                                    className="w-20"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    style={{ backgroundColor: "#018790", color: "white" }}
+                                    onClick={() => handleUpdateQuantity(product.product_id)}
+                                    className="text-xs"
+                                  >
+                                    Add
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingQuantityId(null)}
+                                    className="text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingQuantityId(product.product_id)
+                                    setQuantityValues({ ...quantityValues, [product.product_id]: 0 })
+                                  }}
+                                  className="text-xs"
+                                >
+                                  Add Quantity
+                                </Button>
+                              )
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2 items-center justify-center">
+                              {editingStageId === product.product_id ? (
+                                <>
+                                  <select
+                                    value={selectedStages[product.product_id] || product.production_stage}
+                                    onChange={(e) => setSelectedStages({ ...selectedStages, [product.product_id]: e.target.value })}
+                                    className="text-xs border rounded px-2 py-1"
+                                  >
+                                    {stageOptions.map(stage => (
+                                      <option key={stage} value={stage}>
+                                        {stageLabels[stage]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <Button
+                                    size="sm"
+                                    style={{ backgroundColor: "#018790", color: "white" }}
+                                    onClick={() => handleUpdateStage(product.product_id)}
+                                    className="text-xs"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingStageId(null)}
+                                    className="text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingStageId(product.product_id)}
+                                    title="Edit stage"
+                                  >
+                                    <Edit2 size={16} />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteProduct(product.product_id)}
+                                    title="Delete product"
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

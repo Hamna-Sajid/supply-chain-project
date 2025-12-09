@@ -3,6 +3,8 @@ import { WarehouseHeader } from "@/components/warehouse-header"
 import { KPICards } from "@/components/kpi-cards"
 import { ProductionStatusTable } from "@/components/production-status-table"
 import { MaterialSourcingPanel } from "@/components/material-sourcing-panel"
+import { ManufacturerOrdersPanel } from "@/components/manufacturer-orders-panel"
+import { ManufacturerPaymentsPanel } from "@/components/manufacturer-payments-panel"
 import { ShipmentTracking } from "@/components/shipment-tracking"
 
 export const metadata = {
@@ -28,6 +30,14 @@ export default function ManufacturerDashboard() {
 
           <KPICards />
           <ProductionStatusTable />
+
+          <div className="mb-8">
+            <ManufacturerOrdersPanel />
+          </div>
+
+          <div className="mb-8">
+            <ManufacturerPaymentsPanel />
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">

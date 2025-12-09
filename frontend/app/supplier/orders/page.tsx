@@ -10,11 +10,17 @@ import { Badge } from "@/components/ui/badge"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
 interface Order {
-  id: string
-  manufacturer_name: string
-  status: string
-  total_amount: number
-  created_at: string
+  order_id: string
+  order_status: string
+  order_date: string
+  total_amount?: number
+  manufacturer?: string
+  order_items?: Array<{
+    product_id: string
+    product_name: string
+    quantity: number
+    unit_price: number
+  }>
 }
 
 const statusColors: Record<string, string> = {
@@ -24,10 +30,16 @@ const statusColors: Record<string, string> = {
   delivered: "bg-green-100 text-green-800",
 }
 
+const capitalizeStatus = (status: string) => {
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+}
+
 export default function ManufacturerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [newStatus, setNewStatus] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -35,6 +47,7 @@ export default function ManufacturerOrdersPage() {
     const fetchOrders = async () => {
       try {
         setLoading(true)
+        setError("")
         const token = localStorage.getItem("token")
         if (!token) {
           setError("Please log in again")
@@ -47,11 +60,21 @@ export default function ManufacturerOrdersPage() {
 
         if (response.ok) {
           const data = await response.json()
-          setOrders(data.orders || [])
+          console.log('Orders data received:', data)
+          // Handle both array and object formats
+          const ordersData = Array.isArray(data) ? data : (data.orders || [])
+          setOrders(ordersData)
         } else {
-          setError("Failed to load orders")
+          const errorData = await response.text()
+          console.error(`Error response: ${response.status} - ${errorData}`)
+          if (response.status === 403) {
+            setError("❌ Access Denied: You are not logged in as a Supplier. Please log in with a supplier account to view supplier orders.")
+          } else {
+            setError(`Failed to load orders: ${response.status}`)
+          }
         }
       } catch (err) {
+        console.error('Fetch error:', err)
         setError(err instanceof Error ? err.message : "Failed to load orders")
       } finally {
         setLoading(false)
@@ -61,7 +84,42 @@ export default function ManufacturerOrdersPage() {
     fetchOrders()
   }, [])
 
-  const filteredOrders = selectedStatus === "all" ? orders : orders.filter((o) => o.status.toLowerCase() === selectedStatus.toLowerCase())
+  const handleUpdateStatus = async () => {
+    if (!selectedOrder || !newStatus) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${API_URL}/supplier/orders/${selectedOrder.order_id}/status`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus.toLowerCase() }),
+      })
+
+      if (response.ok) {
+        // Update the order in the list
+        setOrders(
+          orders.map((o) =>
+            o.order_id === selectedOrder.order_id ? { ...o, order_status: newStatus.toLowerCase() } : o
+          )
+        )
+        setSelectedOrder({ ...selectedOrder, order_status: newStatus.toLowerCase() })
+        setShowStatusModal(false)
+        setNewStatus("")
+      } else {
+        alert("Failed to update order status")
+      }
+    } catch (err) {
+      console.error("Error updating status:", err)
+      alert("Error updating order status")
+    }
+  }
+
+  const filteredOrders = selectedStatus === "all" ? orders : orders.filter((o) => o.order_status.toLowerCase() === selectedStatus.toLowerCase())
 
   return (
     <div className="flex">
@@ -91,7 +149,7 @@ export default function ManufacturerOrdersPage() {
             <>
               {/* Status Filters */}
               <div className="flex flex-wrap gap-2 mb-6">
-                {["all", "Pending", "Processing", "Shipped", "Delivered"].map((status) => (
+                {["all", "pending", "processing", "shipped", "delivered"].map((status) => (
                   <Button
                     key={status}
                     variant={selectedStatus === status ? "default" : "outline"}
@@ -102,7 +160,7 @@ export default function ManufacturerOrdersPage() {
                         : {}
                     }
                   >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {capitalizeStatus(status)}
                   </Button>
                 ))}
               </div>
@@ -128,21 +186,25 @@ export default function ManufacturerOrdersPage() {
                         </thead>
                         <tbody>
                           {filteredOrders.map((order) => (
-                            <tr key={order.id} className="border-b hover:bg-gray-50 cursor-pointer">
-                              <td className="py-3 px-4 font-medium text-blue-600">{order.id}</td>
-                              <td className="py-3 px-4">{order.manufacturer_name}</td>
+                            <tr key={order.order_id} className="border-b hover:bg-gray-50 cursor-pointer">
+                              <td className="py-3 px-4 font-medium text-blue-600">{order.order_id}</td>
+                              <td className="py-3 px-4">{order.manufacturer || "Unknown"}</td>
                               <td className="py-3 px-4">
-                                <Badge className={statusColors[order.status.toLowerCase()] || "bg-gray-100 text-gray-800"}>
-                                  {order.status}
+                                <Badge className={statusColors[order.order_status.toLowerCase()] || "bg-gray-100 text-gray-800"}>
+                                  {capitalizeStatus(order.order_status)}
                                 </Badge>
                               </td>
-                              <td className="py-3 px-4 font-semibold">${order.total_amount.toLocaleString()}</td>
-                              <td className="py-3 px-4 text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
+                              <td className="py-3 px-4 font-semibold">${(order.total_amount || 0).toLocaleString()}</td>
+                              <td className="py-3 px-4 text-gray-600">{new Date(order.order_date).toLocaleDateString()}</td>
                               <td className="py-3 px-4">
                                 <Button
                                   size="sm"
                                   style={{ backgroundColor: "#018790", color: "white" }}
-                                  onClick={() => setSelectedOrder(order)}
+                                  onClick={() => {
+                                    setSelectedOrder(order)
+                                    setNewStatus(order.order_status)
+                                    setShowStatusModal(true)
+                                  }}
                                 >
                                   Update Status
                                 </Button>
@@ -166,31 +228,45 @@ export default function ManufacturerOrdersPage() {
                         <div>
                           <p className="text-xs font-semibold text-gray-600">ORDER ID</p>
                           <p className="text-lg font-bold" style={{ color: "#005461" }}>
-                            {selectedOrder.id}
+                            {selectedOrder.order_id}
                           </p>
                         </div>
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600">CUSTOMER</p>
-                          <p className="font-medium">{selectedOrder.manufacturer_name}</p>
+                          <p className="font-medium">{selectedOrder.manufacturer || "Unknown"}</p>
                         </div>
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600">CURRENT STATUS</p>
-                          <Badge className={statusColors[selectedOrder.status.toLowerCase()] || "bg-gray-100 text-gray-800"}>
-                            {selectedOrder.status}
+                          <Badge className={statusColors[selectedOrder.order_status.toLowerCase()] || "bg-gray-100 text-gray-800"}>
+                            {capitalizeStatus(selectedOrder.order_status)}
                           </Badge>
                         </div>
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600">TOTAL AMOUNT</p>
-                          <p className="text-xl font-bold text-green-600">${selectedOrder.total_amount.toLocaleString()}</p>
+                          <p className="text-xl font-bold text-green-600">${(selectedOrder.total_amount || 0).toLocaleString()}</p>
                         </div>
 
                         <div>
                           <p className="text-xs font-semibold text-gray-600">ORDER DATE</p>
-                          <p className="text-sm">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
+                          <p className="text-sm">{new Date(selectedOrder.order_date).toLocaleDateString()}</p>
                         </div>
+
+                        {selectedOrder.order_items && selectedOrder.order_items.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 mb-2">ITEMS</p>
+                            <div className="bg-gray-50 rounded-md p-3 space-y-2">
+                              {selectedOrder.order_items.map((item) => (
+                                <div key={item.product_id} className="text-sm border-b pb-2">
+                                  <p className="font-medium">{item.product_name}</p>
+                                  <p className="text-gray-600">Qty: {item.quantity} × ${item.unit_price.toFixed(2)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-gray-500 text-center py-8">Select an order to view details</p>
@@ -199,6 +275,61 @@ export default function ManufacturerOrdersPage() {
                 </Card>
               </div>
             </>
+          )}
+
+          {/* Status Update Modal */}
+          {showStatusModal && selectedOrder && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-md border-0 shadow-lg">
+                <CardHeader className="border-b pb-4">
+                  <CardTitle className="text-lg">Update Order Status</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Order ID</label>
+                    <p className="mt-1 text-gray-900 font-semibold">{selectedOrder.order_id}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Current Status</label>
+                    <p className="mt-1 text-gray-900">{capitalizeStatus(selectedOrder.order_status)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">New Status</label>
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value)}
+                      className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm"
+                    >
+                      <option value="">Select new status</option>
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowStatusModal(false)
+                        setNewStatus("")
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1 text-white"
+                      style={{ backgroundColor: "#018790" }}
+                      onClick={handleUpdateStatus}
+                      disabled={!newStatus || newStatus === selectedOrder.order_status}
+                    >
+                      Update Status
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </main>

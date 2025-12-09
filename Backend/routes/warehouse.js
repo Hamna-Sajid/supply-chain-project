@@ -101,6 +101,49 @@ router.put('/shipments/:id/reject', authenticateToken, checkWarehouseRole, async
   }
 });
 
+// Update shipment status (in_transit or delivered)
+router.put('/shipments/:id/status', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const userId = req.user.userId;
+
+  if (!['in_transit', 'delivered'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only in_transit and delivered are allowed.' });
+  }
+
+  try {
+    // Check if user is manufacturer or warehouse for this shipment
+    const { data: shipment, error: fetchError } = await supabase
+      .from('shipments')
+      .select('*')
+      .eq('shipment_id', id)
+      .single();
+
+    if (fetchError || !shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Verify user owns this shipment (manufacturer or warehouse)
+    if (shipment.manufacturer_id !== userId && shipment.whm_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status })
+      .eq('shipment_id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ message: `Shipment status updated to ${status}`, shipment: data });
+  } catch (error) {
+    console.error('Update shipment status error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ============================================
 // INVENTORY MANAGEMENT
 // ============================================
@@ -150,7 +193,7 @@ router.get('/inventory/low-stock', authenticateToken, checkWarehouseRole, async 
         reorder_level,
         products(product_name, category)
       `)
-      .eq('warehouse_id', req.user.userId);
+      .eq('user_id', req.user.userId);
 
     if (error) throw error;
 
@@ -251,17 +294,20 @@ router.get('/dashboard', authenticateToken, checkWarehouseRole, async (req, res)
   try {
     console.log(`Fetching dashboard for warehouse: ${req.user.userId}`);
 
-    // Get incoming shipments count
+    // Get incoming shipments count for this warehouse (exclude delivered, accepted, rejected)
     const { data: shipmentsData, error: shipmentsError } = await supabase
       .from('shipments')
       .select('shipment_id')
+      .eq('whm_id', req.user.userId)
+      .neq('status', 'delivered')
       .neq('status', 'accepted')
       .neq('status', 'rejected');
 
-    // Get inventory value
+    // Get inventory value for this warehouse
     const { data: inventoryData, error: inventoryError } = await supabase
       .from('inventory')
-      .select('quantity_available, cost_price');
+      .select('quantity_available, cost_price')
+      .eq('user_id', req.user.userId);
 
     // Get pending orders count
     const { data: ordersData, error: ordersError } = await supabase
