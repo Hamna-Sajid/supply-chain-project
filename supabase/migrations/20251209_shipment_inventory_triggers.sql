@@ -1,4 +1,10 @@
--- Trigger to decrease manufacturer inventory when shipment is accepted
+-- ============================================
+-- Shipment Inventory Management Triggers
+-- ============================================
+-- This migration adds automatic inventory management when shipments are accepted or delivered
+-- Execute these SQL statements in your Supabase SQL Editor to apply the triggers
+
+-- 1. Trigger to decrease manufacturer inventory when shipment is accepted
 CREATE OR REPLACE FUNCTION decrease_inventory_on_shipment_accepted()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -20,7 +26,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop trigger if exists
+-- Drop trigger if exists (for idempotency)
 DROP TRIGGER IF EXISTS shipment_accepted_inventory_trigger ON shipments;
 
 -- Create trigger for shipment acceptance
@@ -29,7 +35,9 @@ AFTER UPDATE ON shipments
 FOR EACH ROW
 EXECUTE FUNCTION decrease_inventory_on_shipment_accepted();
 
--- Trigger to increase warehouse inventory when shipment is delivered
+-- ============================================
+
+-- 2. Trigger to increase warehouse inventory when shipment is delivered
 CREATE OR REPLACE FUNCTION increase_inventory_on_shipment_delivered()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -64,7 +72,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop trigger if exists
+-- Drop trigger if exists (for idempotency)
 DROP TRIGGER IF EXISTS shipment_delivered_inventory_trigger ON shipments;
 
 -- Create trigger for shipment delivery
@@ -72,3 +80,16 @@ CREATE TRIGGER shipment_delivered_inventory_trigger
 AFTER UPDATE ON shipments
 FOR EACH ROW
 EXECUTE FUNCTION increase_inventory_on_shipment_delivered();
+
+-- ============================================
+-- Summary of Triggers:
+-- ============================================
+-- 1. When a shipment status is updated to 'accepted':
+--    - The manufacturer's inventory for that product decreases by the shipment quantity
+--
+-- 2. When a shipment status is updated to 'delivered':
+--    - The warehouse's inventory for that product increases by the shipment quantity
+--    - If warehouse doesn't have the product in inventory, a new entry is created
+--    - Cost price and selling price are copied from the product master data
+-- ============================================
+
