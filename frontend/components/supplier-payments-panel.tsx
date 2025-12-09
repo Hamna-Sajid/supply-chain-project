@@ -317,8 +317,8 @@ export function SupplierPaymentsPanel() {
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-gray-600">ORDER TOTAL</p>
-                  <p className="text-xl font-bold text-green-600">${(selectedPayment.order_total || 0).toLocaleString()}</p>
+                  <p className="text-xs font-semibold text-gray-600">PAYMENT AMOUNT</p>
+                  <p className="text-xl font-bold text-green-600">${(selectedPayment.payment.payment_amount || 0).toLocaleString()}</p>
                 </div>
 
                 <div>

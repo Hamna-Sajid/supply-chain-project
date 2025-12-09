@@ -227,7 +227,32 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
   try {
     // Convert status to lowercase to match database constraint
     const normalizedStatus = status.toLowerCase();
+    
+    console.log('Update order status request:');
+    console.log('  order_id (from URL):', id, 'type:', typeof id);
+    console.log('  new status:', normalizedStatus);
+    console.log('  delivered_by (userId):', req.user.userId);
 
+    // First fetch the order to verify it exists and belongs to this supplier
+    const { data: orderData, error: fetchError } = await supabase
+      .from('orders')
+      .select('order_id, delivered_by, order_status')
+      .eq('delivered_by', req.user.userId)
+      .eq('order_id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('Fetch order error:', fetchError);
+      throw fetchError;
+    }
+
+    if (!orderData) {
+      return res.status(404).json({ error: 'Order not found or does not belong to you' });
+    }
+
+    console.log('Order found:', orderData);
+
+    // Now update it - try without the delivered_by filter since we already verified ownership
     const { data, error } = await supabase
       .from('orders')
       .update({
@@ -235,20 +260,47 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
         updated_at: new Date().toISOString()
       })
       .eq('order_id', id)
-      .eq('delivered_by', req.user.userId)
       .select()
       .single();
 
-    if (error) throw error;
-
-    if (!data) {
-      return res.status(404).json({ error: 'Order not found' });
+    if (error) {
+      console.error('Update order status error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // If still failing, try a more direct approach with the exact order_id value
+      if (error.code === '42883') {
+        console.log('Type casting issue detected. Trying alternative approach...');
+        // Use a simple filter without additional conditions
+        const { data: retryData, error: retryError } = await supabase
+          .from('orders')
+          .update({
+            order_status: normalizedStatus,
+            updated_at: new Date().toISOString()
+          })
+          .match({ order_id: id })
+          .select()
+          .single();
+        
+        if (retryError) {
+          console.error('Retry also failed:', retryError);
+          throw retryError;
+        }
+        
+        console.log('Retry succeeded:', retryData);
+        return res.json(retryData);
+      }
+      
+      throw error;
     }
 
-    res.json({ ...data, order_status: data.order_status });
+    res.json(data);
   } catch (error) {
     console.error('Update order status error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: error.message || 'Server error' });
   }
 });
 
@@ -627,36 +679,52 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
       .select('*')
       .in('order_id', (orders || []).map(o => o.order_id));
 
+    console.log('Payments fetched from DB:', payments);
+    console.log('Payment error:', paymentError);
+
     // Create a map of payments by order_id for quick lookup
     const paymentMap = {};
     if (payments) {
       payments.forEach(p => {
+        console.log('Mapping payment:', p.order_id, 'amount:', p.amount);
         if (!paymentMap[p.order_id]) {
           paymentMap[p.order_id] = p;
         }
       });
     }
+    
+    console.log('Payment map:', paymentMap);
 
     // Format payments with order details
-    const paymentData = (orders || []).map(order => ({
-      order_id: order.order_id,
-      manufacturer: order.users?.name || 'Unknown',
-      order_date: order.order_date,
-      order_status: order.order_status,
-      order_total: order.total_amount,
-      payment: paymentMap[order.order_id] ? {
-        payment_id: paymentMap[order.order_id].payment_id,
-        payment_date: paymentMap[order.order_id].payment_date,
-        payment_status: paymentMap[order.order_id].status || 'pending',
-        payment_amount: paymentMap[order.order_id].payment_amount || paymentMap[order.order_id].amount || order.total_amount || 0
+    const paymentData = (orders || []).map(order => {
+      const paymentInfo = paymentMap[order.order_id];
+      console.log(`Order ${order.order_id}: paymentInfo =`, paymentInfo);
+      
+      const paymentObj = paymentInfo ? {
+        payment_id: paymentInfo.payment_id || null,
+        payment_date: paymentInfo.payment_date,
+        payment_status: paymentInfo.status || 'pending',
+        payment_amount: paymentInfo.amount || 0  // Use amount from payment table
       } : {
         payment_id: null,
         payment_date: null,
         payment_status: 'pending',
-        payment_amount: order.total_amount || 0
-      }
-    }));
+        payment_amount: order.total_amount || 0  // Fallback to order total
+      };
+      
+      console.log(`Order ${order.order_id}: payment_amount =`, paymentObj.payment_amount, '(from', paymentInfo ? 'payment table' : 'fallback', ')');
+      
+      return {
+        order_id: order.order_id,
+        manufacturer: order.users?.name || 'Unknown',
+        order_date: order.order_date,
+        order_status: order.order_status,
+        order_total: order.total_amount,
+        payment: paymentObj
+      };
+    });
 
+    console.log('Payment data prepared:', paymentData);
     res.json({ payments: paymentData });
   } catch (error) {
     console.error('Get supplier payments error:', error);
@@ -697,7 +765,7 @@ router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole,
   const { payment_status, order_id } = req.body;
 
   const validStatus = getValidStatus(payment_status);
-  console.log('Update payment request - payment_id:', payment_id, 'payment_status:', payment_status, 'validStatus:', validStatus, 'order_id:', order_id);
+  console.log('Update payment request - payment_id:', payment_id, 'type:', typeof payment_id, 'payment_status:', payment_status, 'validStatus:', validStatus, 'order_id:', order_id);
 
   try {
     // If payment_id is null or 'null', we need to create a new payment
@@ -741,6 +809,8 @@ router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole,
     }
 
     // Otherwise, update existing payment
+    console.log('Updating payment with payment_id:', payment_id, 'status:', validStatus);
+    
     const { data, error } = await supabase
       .from('payment')
       .update({ status: validStatus })
@@ -750,6 +820,7 @@ router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole,
 
     if (error) {
       console.error('Update payment error:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
       throw error;
     }
 
