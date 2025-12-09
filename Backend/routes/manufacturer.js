@@ -487,7 +487,7 @@ router.post('/shipments', authenticateToken, checkManufacturerRole, async (req, 
       .from('shipments')
       .insert([{
         manufacturer_id: req.user.userId,
-        warehouse_id,
+        whm_id: warehouse_id,
         product_id,
         quantity,
         shipping_address,
