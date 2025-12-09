@@ -41,6 +41,8 @@ export default function ProductManagement() {
   const [formData, setFormData] = useState({ name: "", stage: "planning" })
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [selectedStages, setSelectedStages] = useState<Record<string, string>>({})
+  const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null)
+  const [quantityValues, setQuantityValues] = useState<Record<string, number>>({})
 
   // Fetch products on component load
   useEffect(() => {
@@ -152,6 +154,42 @@ export default function ProductManagement() {
     } catch (err) {
       console.error("Error updating stage:", err)
       setError(err instanceof Error ? err.message : "Error updating stage")
+    }
+  }
+
+  const handleUpdateQuantity = async (id: string) => {
+    const quantity = quantityValues[id]
+    if (quantity === undefined || quantity < 0) {
+      setError("Please enter a valid quantity")
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/products/${id}/quantity`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quantity: Number(quantity),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Failed to add quantity: ${errorText}`)
+      }
+
+      setEditingQuantityId(null)
+      setQuantityValues({ ...quantityValues, [id]: 0 })
+      setError(null)
+      // Refresh products to show any changes
+      await fetchProducts()
+    } catch (err) {
+      console.error("Error updating quantity:", err)
+      setError(err instanceof Error ? err.message : "Error adding quantity")
     }
   }
 
@@ -274,6 +312,9 @@ export default function ProductManagement() {
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Production Stage
                         </th>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Quantity
+                        </th>
                         <th className="text-center py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Action
                         </th>
@@ -287,6 +328,52 @@ export default function ProductManagement() {
                             <Badge className={stageColors[product.production_stage] || "bg-gray-100 text-gray-800"}>
                               {stageLabels[product.production_stage] || product.production_stage}
                             </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            {product.production_stage === "completed" ? (
+                              editingQuantityId === product.product_id ? (
+                                <div className="flex gap-2 items-center">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={quantityValues[product.product_id] || ""}
+                                    onChange={(e) => setQuantityValues({ ...quantityValues, [product.product_id]: parseInt(e.target.value) || 0 })}
+                                    placeholder="Enter quantity"
+                                    className="w-20"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    style={{ backgroundColor: "#018790", color: "white" }}
+                                    onClick={() => handleUpdateQuantity(product.product_id)}
+                                    className="text-xs"
+                                  >
+                                    Add
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingQuantityId(null)}
+                                    className="text-xs"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingQuantityId(product.product_id)
+                                    setQuantityValues({ ...quantityValues, [product.product_id]: 0 })
+                                  }}
+                                  className="text-xs"
+                                >
+                                  Add Quantity
+                                </Button>
+                              )
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex gap-2 items-center justify-center">

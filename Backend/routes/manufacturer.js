@@ -49,13 +49,14 @@ const checkManufacturerRole = (req, res, next) => {
 // Get dashboard KPIs
 router.get('/dashboard', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
-    // Get total products created
+    // Get products in production (all except completed)
     const { data: productionData, error: prodError } = await supabase
       .from('products')
-      .select('product_id')
-      .eq('manufacturer_id', req.user.userId);
+      .select('product_id, production_stage')
+      .eq('manufacturer_id', req.user.userId)
+      .neq('production_stage', 'completed');
 
-    // Get total inventory
+    // Get finished goods (sum of inventory quantities)
     const { data: inventoryData, error: invError } = await supabase
       .from('inventory')
       .select('quantity_available')
@@ -77,8 +78,12 @@ router.get('/dashboard', authenticateToken, checkManufacturerRole, async (req, r
       throw prodError || invError || ordError || shipError;
     }
 
+    // Products in production (those not yet completed)
     const totalProduction = (productionData || []).length;
+    
+    // Finished goods stock (sum of all inventory quantities)
     const totalInventory = (inventoryData || []).reduce((sum, i) => sum + (i.quantity_available || 0), 0);
+    
     const totalOrders = (ordersData || []).length;
     const totalShipments = (shipmentsData || []).length;
 
@@ -264,6 +269,84 @@ router.put('/products/:id/stage', authenticateToken, checkManufacturerRole, asyn
   } catch (error) {
     console.error('Update stage error:', error);
     res.status(500).json({ error: error.message || 'Failed to update production stage' });
+  }
+});
+
+// Update product quantity (only when status is 'completed')
+router.put('/products/:id/quantity', authenticateToken, checkManufacturerRole, async (req, res) => {
+  const { id } = req.params;
+  const { quantity } = req.body;
+
+  if (quantity === undefined || quantity === null || quantity < 0) {
+    return res.status(400).json({ error: 'Valid quantity is required' });
+  }
+
+  try {
+    // Get the product and verify it's completed
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_id', id)
+      .eq('manufacturer_id', req.user.userId)
+      .single();
+
+    if (fetchError || !product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (product.production_stage !== 'completed') {
+      return res.status(400).json({ error: 'Quantity can only be added when production stage is completed' });
+    }
+
+    // Check if product is already in inventory
+    const { data: existingInventory } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('product_id', id)
+      .eq('user_id', req.user.userId)
+      .single();
+
+    let inventoryData;
+    if (existingInventory) {
+      // Update existing inventory
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          quantity_available: quantity,
+          cost_price: product.cost_price,
+          selling_price: product.selling_price
+        })
+        .eq('product_id', id)
+        .eq('user_id', req.user.userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      inventoryData = data;
+    } else {
+      // Create new inventory entry
+      const { data, error } = await supabase
+        .from('inventory')
+        .insert([{
+          product_id: id,
+          user_id: req.user.userId,
+          quantity_available: quantity,
+          cost_price: product.cost_price || 0,
+          selling_price: product.selling_price || 0,
+          reorder_level: 10
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      inventoryData = data;
+    }
+
+    console.log('Product quantity added to inventory:', id, 'quantity:', quantity);
+    res.json({ message: 'Quantity added to inventory successfully', inventory: inventoryData });
+  } catch (error) {
+    console.error('Update quantity error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update quantity' });
   }
 });
 
