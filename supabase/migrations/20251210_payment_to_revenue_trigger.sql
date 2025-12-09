@@ -1,5 +1,5 @@
 -- Trigger to automatically create revenue entry when payment is marked as 'paid'
--- This trigger uses amount and order_id from the payment table
+-- This trigger uses amount directly from the payment table (payment.amount)
 -- Run this SQL in Supabase SQL Editor
 
 -- Create or replace the function
@@ -14,7 +14,7 @@ BEGIN
       created_at
     ) VALUES (
       NEW.user_id,
-      NEW.amount,
+      NEW.amount,  -- Uses amount column from payment table
       NOW()
     );
     
