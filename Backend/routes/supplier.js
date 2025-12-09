@@ -495,7 +495,7 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
     const revenues = (data || []).map(rev => ({
       id: rev.id,
       amount: rev.amount,
-      source: rev.source,
+      source: rev.source || 'Payment',  // Use source if it exists, otherwise use 'Payment'
       date: rev.created_at
     }));
 
