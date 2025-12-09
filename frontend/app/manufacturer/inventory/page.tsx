@@ -35,6 +35,7 @@ export default function FinishedGoodsInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<'cost_price' | 'selling_price' | null>(null)
   const [editingPrices, setEditingPrices] = useState<Record<string, number>>({})
@@ -136,6 +137,9 @@ export default function FinishedGoodsInventory() {
       setEditingId(null)
       setEditingField(null)
       setEditingPrices({})
+      setError(null)
+      setSuccess(`${field === 'cost_price' ? 'Cost' : 'Selling'} price updated successfully!`)
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(`Failed to update ${field}`)
     }
@@ -191,7 +195,8 @@ export default function FinishedGoodsInventory() {
 
       setError(null)
       handleCloseShipmentModal()
-      alert("Shipment created successfully!")
+      setSuccess("Shipment created successfully!")
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError("Failed to create shipment")
     } finally {
@@ -220,6 +225,7 @@ export default function FinishedGoodsInventory() {
           </div>
 
           {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+          {success && <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="border-0 shadow-sm">

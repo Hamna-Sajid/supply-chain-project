@@ -33,6 +33,7 @@ export default function MaterialSourcing() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMaterials()
@@ -82,33 +83,40 @@ export default function MaterialSourcing() {
     try {
       setIsSubmitting(true)
       const token = localStorage.getItem("token")
+      
+      const orderData = {
+        supplier_id: selectedMaterial.supplier_id,
+        items: [
+          {
+            material_id: selectedMaterial.material_id,
+            quantity: Number.parseInt(orderQuantity),
+            unit_price: selectedMaterial.unit_price,
+          },
+        ],
+      }
+      
+      console.log("Placing order with data:", orderData)
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/orders`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          supplier_id: selectedMaterial.users?.id,
-          items: [
-            {
-              material_id: selectedMaterial.material_id,
-              quantity: Number.parseInt(orderQuantity),
-              unit_price: selectedMaterial.unit_price,
-            },
-          ],
-        }),
+        body: JSON.stringify(orderData),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to place order")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to place order")
       }
 
       setShowOrderModal(false)
       setSelectedMaterial(null)
       setOrderQuantity("")
       setError(null)
-      alert("Order placed successfully!")
+      setSuccess("Order placed successfully!")
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       console.error("Error placing order:", err)
       setError(err instanceof Error ? err.message : "Error placing order")
@@ -133,6 +141,7 @@ export default function MaterialSourcing() {
           </div>
 
           {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+          {success && <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
 
           <Card className="mb-6 border-0 shadow-sm">
             <CardHeader>

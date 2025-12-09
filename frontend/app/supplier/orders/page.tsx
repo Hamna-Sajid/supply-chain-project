@@ -42,6 +42,7 @@ export default function ManufacturerOrdersPage() {
   const [newStatus, setNewStatus] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -110,12 +111,14 @@ export default function ManufacturerOrdersPage() {
         setSelectedOrder({ ...selectedOrder, order_status: newStatus.toLowerCase() })
         setShowStatusModal(false)
         setNewStatus("")
+        setSuccess("Order status updated successfully!")
+        setTimeout(() => setSuccess(""), 3000)
       } else {
-        alert("Failed to update order status")
+        setError("Failed to update order status")
       }
     } catch (err) {
       console.error("Error updating status:", err)
-      alert("Error updating order status")
+      setError("Error updating order status")
     }
   }
 
@@ -138,6 +141,12 @@ export default function ManufacturerOrdersPage() {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+              {success}
             </div>
           )}
 

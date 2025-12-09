@@ -30,6 +30,7 @@ export default function MaterialsCatalogPage() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
     const fetchMaterials = async () => {
@@ -88,6 +89,8 @@ export default function MaterialsCatalogPage() {
             setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
             setEditingId(null)
             setError("")
+            setSuccess("Material updated successfully!")
+            setTimeout(() => setSuccess(""), 3000)
           } else {
             const errorData = await response.json()
             setError(errorData.error || "Failed to update material")
@@ -113,6 +116,8 @@ export default function MaterialsCatalogPage() {
             setMaterials([...materials, newMaterial])
             setFormData({ name: "", description: "", quantity: "", unitPrice: "" })
             setError("")
+            setSuccess("Material added successfully!")
+            setTimeout(() => setSuccess(""), 3000)
           } else {
             const errorData = await response.json()
             setError(errorData.error || "Failed to add material")
@@ -149,6 +154,8 @@ export default function MaterialsCatalogPage() {
 
       if (response.ok) {
         setMaterials(materials.filter((m) => m.material_id !== id))
+        setSuccess("Material deleted successfully!")
+        setTimeout(() => setSuccess(""), 3000)
       } else {
         setError("Failed to delete material")
       }
@@ -174,6 +181,12 @@ export default function MaterialsCatalogPage() {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+              {success}
             </div>
           )}
 

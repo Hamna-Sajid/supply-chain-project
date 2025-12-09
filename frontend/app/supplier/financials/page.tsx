@@ -32,6 +32,7 @@ export default function FinancialsPage() {
   const [newExpense, setNewExpense] = useState({ amount: "", category: "" })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
     const fetchFinancials = async () => {
@@ -108,6 +109,8 @@ export default function FinancialsPage() {
           setExpenses([...expenses, newExp])
           setNewExpense({ amount: "", category: "" })
           setError("") // Clear any previous errors
+          setSuccess("Expense added successfully!")
+          setTimeout(() => setSuccess(""), 3000)
         } else {
           const errorData = await response.json()
           setError(errorData.error || "Failed to add expense")
@@ -128,6 +131,8 @@ export default function FinancialsPage() {
 
       if (response.ok) {
         setExpenses(expenses.filter((e) => e.id !== id))
+        setSuccess("Expense deleted successfully!")
+        setTimeout(() => setSuccess(""), 3000)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete expense")
@@ -151,6 +156,12 @@ export default function FinancialsPage() {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+              {success}
             </div>
           )}
 

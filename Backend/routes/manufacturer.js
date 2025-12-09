@@ -569,7 +569,7 @@ router.put('/shipments/:id/status', authenticateToken, checkManufacturerRole, as
 router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { supplier_id, items } = req.body;
 
-  console.log('Place order request:', { supplier_id, items, userId: req.user.userId });
+  console.log('📦 Place order request:', { supplier_id, items, userId: req.user.userId });
 
   try {
     if (!supplier_id || !items || items.length === 0) {
@@ -581,7 +581,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       return sum + (parseFloat(item.unit_price || 0) * parseInt(item.quantity || 0));
     }, 0);
 
-    console.log('Calculated total amount:', totalAmount);
+    console.log('💰 Calculated total amount:', totalAmount);
 
     // Create order with total_amount
     const { data: orderData, error: orderError } = await supabase
@@ -597,36 +597,102 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       .single();
 
     if (orderError) {
-      console.error('Order creation error:', orderError);
+      console.error('❌ Order creation error:', orderError);
       throw orderError;
     }
 
-    console.log('Order created:', orderData);
+    console.log('✅ Order created:', orderData);
 
-    // Add order items - use product_id column (stores material_id for raw material orders)
-    for (const item of items) {
-      console.log('Adding item to order:', { order_id: orderData.order_id, item });
+    // Add order items
+    if (!items || items.length === 0) {
+      return res.status(201).json({
+        message: 'Order placed successfully (no items)',
+        order: orderData
+      });
+    }
 
-      const { error: itemError } = await supabase
-        .from('order_items')
-        .insert([{
-          order_id: orderData.order_id,
-          product_id: item.material_id,  // Store material_id in product_id column
+    console.log('📋 Starting to insert', items.length, 'order items...');
+    const insertedItems = [];
+    let lastError = null;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      try {
+        console.log(`[Item ${i + 1}/${items.length}] Processing:`, { 
+          material_id: item.material_id, 
           quantity: item.quantity,
           unit_price: item.unit_price
-        }]);
+        });
 
-      if (itemError) {
-        console.error('Item insertion error:', itemError);
-        console.error('Item data attempted:', { order_id: orderData.order_id, product_id: item.material_id, quantity: item.quantity, unit_price: item.unit_price });
-        throw itemError;
+        const orderItemData = {
+          order_id: orderData.order_id,
+          product_id: item.material_id,
+          quantity: parseInt(item.quantity) || 1,
+          unit_price: parseFloat(item.unit_price) || 0
+        };
+        
+        console.log(`[Item ${i + 1}] Payload:`, orderItemData);
+
+        const { data: itemData, error: itemError } = await supabase
+          .from('order_items')
+          .insert([orderItemData])
+          .select();
+
+        if (itemError) {
+          lastError = itemError;
+          console.error(`[Item ${i + 1}] ❌ SUPABASE ERROR:`, {
+            code: itemError.code,
+            message: itemError.message,
+            details: itemError.details,
+            hint: itemError.hint,
+            statusCode: itemError.statusCode
+          });
+          // Try to get more info about the table
+          console.error('[Item', i + 1, '] Attempted to insert into order_items table');
+          console.error('Order ID:', orderData.order_id, 'Type:', typeof orderData.order_id);
+          console.error('Product ID:', item.material_id, 'Type:', typeof item.material_id);
+          continue;
+        }
+        
+        if (!itemData || itemData.length === 0) {
+          console.warn(`[Item ${i + 1}] ⚠️ No data returned from insert (but no error)`, itemData);
+          continue;
+        }
+
+        console.log(`[Item ${i + 1}] ✅ Inserted successfully:`, itemData[0]);
+        insertedItems.push(itemData[0]);
+      } catch (error) {
+        lastError = error;
+        console.error(`[Item ${i + 1}] 🔴 Exception:`, error instanceof Error ? error.message : String(error));
       }
     }
 
-    console.log('Order completed successfully with total amount:', totalAmount);
-    res.status(201).json({
-      message: 'Order placed successfully',
-      order: orderData
+    // Return success if at least one item was inserted
+    if (insertedItems.length > 0) {
+      console.log(`✅ Order ${orderData.order_id} completed with ${insertedItems.length}/${items.length} items`);
+      return res.status(201).json({
+        message: `Order placed successfully (${insertedItems.length} of ${items.length} items created)`,
+        order: orderData,
+        itemsCreated: insertedItems.length,
+        note: insertedItems.length < items.length ? `Warning: ${items.length - insertedItems.length} items failed to insert` : undefined
+      });
+    }
+
+    // If no items inserted and we have an error
+    if (lastError) {
+      console.error(`❌ Failed to insert any items for order ${orderData.order_id}`);
+      return res.status(500).json({ 
+        error: 'Failed to create order items',
+        message: lastError.message,
+        code: lastError.code,
+        hint: lastError.hint || 'Check if order_items table exists and has correct schema',
+        details: lastError.details
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to create order items',
+      message: 'No items could be inserted and no error was returned'
     });
   } catch (error) {
     console.error('Place order error:', error);

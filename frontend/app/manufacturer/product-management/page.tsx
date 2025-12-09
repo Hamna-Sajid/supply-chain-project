@@ -38,6 +38,7 @@ export default function ProductManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", stage: "planning" })
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [selectedStages, setSelectedStages] = useState<Record<string, string>>({})
@@ -112,6 +113,8 @@ export default function ProductManagement() {
       setFormData({ name: "", stage: "planning" })
       setShowForm(false)
       setError(null)
+      setSuccess("Product created successfully!")
+      setTimeout(() => setSuccess(null), 3000)
       await fetchProducts()
     } catch (err) {
       console.error("Error adding product:", err)
@@ -151,6 +154,8 @@ export default function ProductManagement() {
       ))
       setEditingStageId(null)
       setError(null)
+      setSuccess("Production stage updated successfully!")
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       console.error("Error updating stage:", err)
       setError(err instanceof Error ? err.message : "Error updating stage")
@@ -185,6 +190,8 @@ export default function ProductManagement() {
       setEditingQuantityId(null)
       setQuantityValues({ ...quantityValues, [id]: 0 })
       setError(null)
+      setSuccess("Quantity updated successfully!")
+      setTimeout(() => setSuccess(null), 3000)
       // Refresh products to show any changes
       await fetchProducts()
     } catch (err) {
@@ -213,6 +220,8 @@ export default function ProductManagement() {
 
       setProducts(products_state.filter((p) => p.product_id !== id))
       setError(null)
+      setSuccess("Product deleted successfully!")
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       console.error("Error deleting product:", err)
       setError(err instanceof Error ? err.message : "Error deleting product")
@@ -245,6 +254,7 @@ export default function ProductManagement() {
           </div>
 
           {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+          {success && <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
 
           {showForm && (
             <Card className="mb-6 border-0 shadow-sm">
