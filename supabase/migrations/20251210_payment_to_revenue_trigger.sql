@@ -7,7 +7,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- If payment status changed to 'paid', create a revenue entry
   IF NEW.status = 'paid' AND (OLD.status IS NULL OR OLD.status != 'paid') THEN
-    INSERT INTO revenues (
+    INSERT INTO revenue (
       user_id,
       amount,
       source,
