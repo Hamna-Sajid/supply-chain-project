@@ -54,8 +54,13 @@ export function QuickSalePOS() {
         }
 
         const data = await response.json()
-        setProducts(data.products || [])
-        setFilteredProducts(data.products || [])
+        // Remove duplicates by product_id
+        const uniqueProducts = (data.products || []).filter(
+          (product: POSProduct, index: number, self: POSProduct[]) =>
+            index === self.findIndex((p) => p.product_id === product.product_id)
+        )
+        setProducts(uniqueProducts)
+        setFilteredProducts(uniqueProducts)
       } catch (error) {
         console.error("Error fetching products:", error)
       } finally {
