@@ -132,12 +132,6 @@ export default function WarehouseShipments() {
     }
   }
 
-  const formatStatus = (status: string) => {
-    return status
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase())
-  }
-
   return (
     <div className="flex">
       <ManufacturerSidebar />
