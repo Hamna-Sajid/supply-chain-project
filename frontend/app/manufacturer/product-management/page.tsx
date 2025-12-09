@@ -274,9 +274,6 @@ export default function ProductManagement() {
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Production Stage
                         </th>
-                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                          Quantity
-                        </th>
                         <th className="text-center py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Action
                         </th>
@@ -290,9 +287,6 @@ export default function ProductManagement() {
                             <Badge className={stageColors[product.production_stage] || "bg-gray-100 text-gray-800"}>
                               {stageLabels[product.production_stage] || product.production_stage}
                             </Badge>
-                          </td>
-                          <td className="py-3 px-4">
-                            {product.production_stage === "completed" ? "-" : "-"}
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex gap-2 items-center justify-center">

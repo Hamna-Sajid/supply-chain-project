@@ -241,8 +241,7 @@ router.put('/products/:id/stage', authenticateToken, checkManufacturerRole, asyn
     const { data, error } = await supabase
       .from('products')
       .update({ 
-        production_stage,
-        updated_at: new Date().toISOString()
+        production_stage
       })
       .eq('product_id', id)
       .eq('manufacturer_id', req.user.userId)

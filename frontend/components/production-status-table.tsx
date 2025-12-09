@@ -9,7 +9,6 @@ interface ProductionItem {
   product_id: string
   product_name: string
   production_stage: string
-  quantity?: number | null
 }
 
 const stageOptions = ["planning", "production", "quality_check", "completed"]
@@ -139,7 +138,6 @@ export function ProductionStatusTable() {
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Product Name</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Production Stage</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-600">Quantity</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Action</th>
                 </tr>
               </thead>
@@ -151,9 +149,6 @@ export function ProductionStatusTable() {
                       <Badge className={stageColors[item.production_stage] || "bg-gray-100 text-gray-800"}>
                         {stageLabels[item.production_stage] || item.production_stage}
                       </Badge>
-                    </td>
-                    <td className="py-3 px-4">
-                      {item.production_stage === "completed" ? `${item.quantity || 0} units` : "-"}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex gap-2 items-center">
