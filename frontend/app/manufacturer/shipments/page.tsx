@@ -29,6 +29,8 @@ export default function WarehouseShipments() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     const fetchShipments = async () => {
@@ -87,6 +89,46 @@ export default function WarehouseShipments() {
         return "#f59e0b"
       default:
         return "#6b7280"
+    }
+  }
+
+  const formatStatus = (status: string) => {
+    return status
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  }
+
+  const handleUpdateStatus = async (shipmentId: string, newStatus: string) => {
+    try {
+      setUpdatingStatus(true)
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/shipments/${shipmentId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        setError(data.error || "Failed to update shipment status")
+        return
+      }
+
+      // Update local state
+      setShipments(
+        shipments.map((s) =>
+          s.shipment_id === shipmentId ? { ...s, status: newStatus } : s,
+        ),
+      )
+      setEditingId(null)
+      setError(null)
+    } catch (err) {
+      setError("Failed to update shipment status")
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
@@ -166,17 +208,42 @@ export default function WarehouseShipments() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-medium text-white"
-                          style={{
-                            backgroundColor: getStatusColor(shipment.status),
-                          }}
-                        >
-                          {formatStatus(shipment.status)}
-                        </span>
-                        <Button size="sm" variant="outline">
-                          Details
-                        </Button>
+                        {editingId === shipment.shipment_id ? (
+                          <div className="flex gap-2">
+                            <select
+                              value={shipment.status}
+                              onChange={(e) => handleUpdateStatus(shipment.shipment_id, e.target.value)}
+                              disabled={updatingStatus}
+                              className="border rounded px-2 py-1 text-xs font-medium"
+                            >
+                              <option value="preparing">Preparing</option>
+                              <option value="in_transit">In Transit</option>
+                              <option value="delivered">Delivered</option>
+                            </select>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                              disabled={updatingStatus}
+                            >
+                              Done
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span
+                              className="px-3 py-1 rounded-full text-xs font-medium text-white cursor-pointer hover:opacity-80"
+                              onClick={() => setEditingId(shipment.shipment_id)}
+                              style={{
+                                backgroundColor: getStatusColor(shipment.status),
+                              }}
+                            >
+                              {formatStatus(shipment.status)}
+                            </span>
+                            <Button size="sm" variant="outline">
+                              Details
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}

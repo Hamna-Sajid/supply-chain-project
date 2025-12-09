@@ -526,14 +526,14 @@ router.get('/shipments', authenticateToken, checkManufacturerRole, async (req, r
   }
 });
 
-// Update shipment status (in_transit or delivered)
+// Update shipment status (preparing, in_transit or delivered)
 router.put('/shipments/:id/status', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const userId = req.user.userId;
 
-  if (!['in_transit', 'delivered'].includes(status)) {
-    return res.status(400).json({ error: 'Invalid status. Only in_transit and delivered are allowed.' });
+  if (!['preparing', 'in_transit', 'delivered'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only preparing, in_transit, and delivered are allowed.' });
   }
 
   try {
