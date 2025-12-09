@@ -23,6 +23,8 @@ export default function FinishedGoodsInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingPrices, setEditingPrices] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -58,6 +60,35 @@ export default function FinishedGoodsInventory() {
     if (quantity < reorderLevel) return "Critical"
     if (quantity < reorderLevel * 1.5) return "Low"
     return "Normal"
+  }
+
+  const handleUpdateCostPrice = async (inventoryId: string) => {
+    const newPrice = editingPrices[inventoryId]
+    if (newPrice === undefined || newPrice === null) return
+
+    try {
+      const res = await fetch(`/api/manufacturer/inventory/${inventoryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cost_price: newPrice }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || "Failed to update cost price")
+        return
+      }
+
+      setInventory(
+        inventory.map((item) =>
+          item.inventory_id === inventoryId ? { ...item, cost_price: newPrice } : item,
+        ),
+      )
+      setEditingId(null)
+      setEditingPrices({})
+    } catch (err) {
+      setError("Failed to update cost price")
+    }
   }
 
   const totalUnits = inventory.reduce((sum, item) => sum + item.quantity_available, 0)
@@ -129,9 +160,6 @@ export default function FinishedGoodsInventory() {
                           Product
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
-                          SKU
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Current Qty
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
@@ -151,10 +179,51 @@ export default function FinishedGoodsInventory() {
                         return (
                           <tr key={item.inventory_id} className="border-b hover:bg-gray-100 transition-colors">
                             <td className="py-3 px-4 font-medium">{item.products?.product_name || "Unknown"}</td>
-                            <td className="py-3 px-4">{item.products?.sku || "N/A"}</td>
                             <td className="py-3 px-4">{item.quantity_available} units</td>
                             <td className="py-3 px-4">{item.reorder_level} units</td>
-                            <td className="py-3 px-4">${item.cost_price?.toFixed(2)}</td>
+                            <td className="py-3 px-4">
+                              {editingId === item.inventory_id ? (
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editingPrices[item.inventory_id] ?? item.cost_price}
+                                    onChange={(e) =>
+                                      setEditingPrices({ ...editingPrices, [item.inventory_id]: parseFloat(e.target.value) })
+                                    }
+                                    className="border rounded px-2 py-1 w-20 text-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleUpdateCostPrice(item.inventory_id)}
+                                    className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(null)
+                                      setEditingPrices({})
+                                    }}
+                                    className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2 items-center">
+                                  ${item.cost_price?.toFixed(2)}
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(item.inventory_id)
+                                      setEditingPrices({ [item.inventory_id]: item.cost_price })
+                                    }}
+                                    className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                             <td className="py-3 px-4">
                               {status === "Critical" || status === "Out of Stock" ? (
                                 <div className="flex items-center gap-1 text-red-600">

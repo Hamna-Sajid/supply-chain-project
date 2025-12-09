@@ -350,6 +350,49 @@ router.put('/products/:id/quantity', authenticateToken, checkManufacturerRole, a
   }
 });
 
+// Update inventory cost price
+router.put('/inventory/:id', authenticateToken, checkManufacturerRole, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cost_price } = req.body;
+
+    if (cost_price === undefined || cost_price === null) {
+      return res.status(400).json({ error: 'cost_price is required' });
+    }
+
+    if (isNaN(cost_price) || cost_price < 0) {
+      return res.status(400).json({ error: 'cost_price must be a valid non-negative number' });
+    }
+
+    // Verify inventory belongs to manufacturer
+    const { data: inventoryData, error: fetchError } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('inventory_id', id)
+      .eq('user_id', req.user.userId)
+      .single();
+
+    if (fetchError || !inventoryData) {
+      return res.status(404).json({ error: 'Inventory item not found' });
+    }
+
+    // Update cost price
+    const { error } = await supabase
+      .from('inventory')
+      .update({ cost_price })
+      .eq('inventory_id', id)
+      .eq('user_id', req.user.userId);
+
+    if (error) throw error;
+
+    console.log('Inventory cost price updated:', id, 'new price:', cost_price);
+    res.json({ message: 'Cost price updated successfully', inventory_id: id, cost_price });
+  } catch (error) {
+    console.error('Update inventory cost price error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update cost price' });
+  }
+});
+
 // Get inventory
 router.get('/inventory', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
