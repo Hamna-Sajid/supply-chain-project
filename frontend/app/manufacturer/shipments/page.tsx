@@ -29,6 +29,7 @@ export default function WarehouseShipments() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
@@ -125,6 +126,8 @@ export default function WarehouseShipments() {
       )
       setEditingId(null)
       setError(null)
+      setSuccess("Shipment status updated successfully!")
+      setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError("Failed to update shipment status")
     } finally {
@@ -148,6 +151,7 @@ export default function WarehouseShipments() {
           </div>
 
           {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+          {success && <div className="mb-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card className="border-0 shadow-sm">

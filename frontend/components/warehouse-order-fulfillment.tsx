@@ -17,6 +17,7 @@ export function WarehouseOrderFulfillment() {
   const [orders, setOrders] = useState<RetailerOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -68,6 +69,8 @@ export function WarehouseOrderFulfillment() {
 
       if (response.ok) {
         setOrders(orders.filter(o => o.id !== orderId))
+        setSuccess("Order processed and shipped successfully!")
+        setTimeout(() => setSuccess(null), 3000)
       } else {
         setError("Failed to process order")
       }
@@ -81,8 +84,9 @@ export function WarehouseOrderFulfillment() {
       <CardHeader className="border-b pb-4">
         <CardTitle className="text-lg">New Retailer Orders</CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>}
+      <CardContent className="p-0">
+        {error && <div className="m-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+        {success && <div className="m-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
         {loading && <div className="text-center py-6 text-gray-500">Loading orders...</div>}
         {!loading && orders.length === 0 && <div className="text-center py-6 text-gray-500">No pending orders</div>}
         {!loading && orders.length > 0 && (

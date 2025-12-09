@@ -24,6 +24,7 @@ export function WarehouseIncomingShipments() {
   const [shipments, setShipments] = useState<IncomingShipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchShipments = async () => {
@@ -69,6 +70,8 @@ export function WarehouseIncomingShipments() {
 
       if (response.ok) {
         setShipments(shipments.filter(s => s.id !== shipmentId))
+        setSuccess("Shipment accepted successfully!")
+        setTimeout(() => setSuccess(null), 3000)
       } else {
         setError("Failed to accept shipment")
       }
@@ -87,6 +90,8 @@ export function WarehouseIncomingShipments() {
 
       if (response.ok) {
         setShipments(shipments.filter(s => s.id !== shipmentId))
+        setSuccess("Shipment rejected successfully!")
+        setTimeout(() => setSuccess(null), 3000)
       } else {
         setError("Failed to reject shipment")
       }
@@ -100,8 +105,9 @@ export function WarehouseIncomingShipments() {
       <CardHeader className="border-b pb-4">
         <CardTitle className="text-lg">Pending Deliveries</CardTitle>
       </CardHeader>
-      <CardContent className="pt-6">
-        {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">{error}</div>}
+      <CardContent className="p-0">
+        {error && <div className="m-4 p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>}
+        {success && <div className="m-4 p-4 bg-green-50 text-green-700 rounded-lg">{success}</div>}
         {loading && <div className="text-center py-6 text-gray-500">Loading shipments...</div>}
         {!loading && shipments.length === 0 && <div className="text-center py-6 text-gray-500">No pending shipments</div>}
         {!loading && shipments.length > 0 && (
