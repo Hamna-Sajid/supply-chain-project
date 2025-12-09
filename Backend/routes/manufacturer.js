@@ -238,24 +238,29 @@ router.put('/products/:id/stage', authenticateToken, checkManufacturerRole, asyn
   }
 
   try {
-    const { data, error } = await supabase
+    // First, verify the product exists and belongs to this manufacturer
+    const { data: product, error: fetchError } = await supabase
       .from('products')
-      .update({ 
-        production_stage
-      })
+      .select('*')
       .eq('product_id', id)
       .eq('manufacturer_id', req.user.userId)
-      .select()
       .single();
 
-    if (error) throw error;
-
-    if (!data) {
+    if (fetchError || !product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    // Update only the production_stage field
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ production_stage })
+      .eq('product_id', id)
+      .eq('manufacturer_id', req.user.userId);
+
+    if (updateError) throw updateError;
+
     console.log('Product stage updated:', id, 'to', production_stage);
-    res.json({ message: 'Production stage updated successfully', product: data });
+    res.json({ message: 'Production stage updated successfully', product: { ...product, production_stage } });
   } catch (error) {
     console.error('Update stage error:', error);
     res.status(500).json({ error: error.message || 'Failed to update production stage' });
