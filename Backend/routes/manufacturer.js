@@ -603,6 +603,27 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
 
     console.log('✅ Order created:', orderData);
 
+    // Automatically create a payment entry for this order
+    console.log('📝 Creating payment entry for order:', orderData.order_id);
+    const { data: paymentData, error: paymentError } = await supabase
+      .from('payment')
+      .insert([{
+        order_id: orderData.order_id,
+        user_id: supplier_id,  // The supplier will receive this payment
+        amount: totalAmount,
+        status: 'pending',
+        payment_date: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (paymentError) {
+      console.error('⚠️ Warning: Failed to create payment entry:', paymentError);
+      // Don't fail the order creation if payment creation fails
+    } else {
+      console.log('✅ Payment entry created:', paymentData);
+    }
+
     // Add order items
     if (!items || items.length === 0) {
       return res.status(201).json({
@@ -860,25 +881,30 @@ router.get('/payments', authenticateToken, checkManufacturerRole, async (req, re
     }
 
     // Format payments with order details
-    const paymentData = (orders || []).map(order => ({
-      order_id: order.order_id,
-      supplier: order.users?.name || 'Unknown',
-      order_date: order.order_date,
-      order_status: order.order_status,
-      order_total: order.total_amount,
-      payment: paymentMap[order.order_id] ? {
-        payment_id: paymentMap[order.order_id].payment_id,
-        payment_date: paymentMap[order.order_id].payment_date,
-        payment_status: paymentMap[order.order_id].status || 'pending',
-        payment_amount: paymentMap[order.order_id].payment_amount || paymentMap[order.order_id].amount || order.total_amount || 0
-      } : {
-        payment_id: null,
-        payment_date: null,
-        payment_status: 'pending',
-        payment_amount: order.total_amount || 0
-      }
-    }));
+    const paymentData = (orders || []).map(order => {
+      const paymentInfo = paymentMap[order.order_id];
+      
+      return {
+        order_id: order.order_id,
+        supplier: order.users?.name || 'Unknown',
+        order_date: order.order_date,
+        order_status: order.order_status,
+        order_total: order.total_amount,
+        payment: paymentInfo ? {
+          payment_id: paymentInfo.payment_id || null,
+          payment_date: paymentInfo.payment_date,
+          payment_status: paymentInfo.status || 'pending',
+          payment_amount: paymentInfo.amount || 0  // Use amount from payment table
+        } : {
+          payment_id: null,
+          payment_date: null,
+          payment_status: 'pending',
+          payment_amount: order.total_amount || 0  // Fallback to order total
+        }
+      };
+    });
 
+    console.log('Payment data prepared:', paymentData);
     res.json({ payments: paymentData });
   } catch (error) {
     console.error('Get manufacturer payments error:', error);
