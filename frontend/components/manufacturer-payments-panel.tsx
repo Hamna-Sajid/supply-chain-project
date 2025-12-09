@@ -224,7 +224,7 @@ export function ManufacturerPaymentsPanel() {
                       >
                         <td className="py-3 px-4 font-medium text-blue-600">{p.order_id}</td>
                         <td className="py-3 px-4">{p.supplier}</td>
-                        <td className="py-3 px-4 font-semibold">${(p.order_total || 0).toLocaleString()}</td>
+                        <td className="py-3 px-4 font-semibold">${(p.payment.payment_amount || 0).toLocaleString()}</td>
                         <td className="py-3 px-4">
                           <Badge className={paymentStatusColors[p.payment.payment_status] || "bg-gray-100 text-gray-800"}>
                             {capitalizeStatus(p.payment.payment_status)}
@@ -277,8 +277,8 @@ export function ManufacturerPaymentsPanel() {
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold text-gray-600">ORDER TOTAL</p>
-                  <p className="text-xl font-bold text-green-600">${(selectedPayment.order_total || 0).toLocaleString()}</p>
+                  <p className="text-xs font-semibold text-gray-600">PAYMENT AMOUNT</p>
+                  <p className="text-xl font-bold text-green-600">${(selectedPayment.payment.payment_amount || 0).toLocaleString()}</p>
                 </div>
 
                 <div>

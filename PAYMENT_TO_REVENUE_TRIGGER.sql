@@ -2,6 +2,7 @@
 -- Copy and paste into Supabase SQL Editor
 
 -- The trigger automatically creates a revenue entry when a payment is marked as 'paid'
+-- It uses amount and order_id from the payment table
 -- It prevents duplicate revenues for the same payment
 
 CREATE OR REPLACE FUNCTION create_revenue_on_paid_payment()
@@ -20,6 +21,8 @@ BEGIN
       NEW.amount,
       NOW()
     );
+    
+    RAISE NOTICE 'Revenue entry created: user_id=%, amount=%, order_id=%', NEW.user_id, NEW.amount, NEW.order_id;
   END IF;
   RETURN NEW;
 END;
