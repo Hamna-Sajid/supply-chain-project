@@ -228,6 +228,41 @@ router.delete('/products/:id', authenticateToken, checkManufacturerRole, async (
   }
 });
 
+// Update product production stage
+router.put('/products/:id/stage', authenticateToken, checkManufacturerRole, async (req, res) => {
+  const { id } = req.params;
+  const { production_stage } = req.body;
+
+  if (!production_stage) {
+    return res.status(400).json({ error: 'Production stage is required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        production_stage,
+        updated_at: new Date().toISOString()
+      })
+      .eq('product_id', id)
+      .eq('manufacturer_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    console.log('Product stage updated:', id, 'to', production_stage);
+    res.json({ message: 'Production stage updated successfully', product: data });
+  } catch (error) {
+    console.error('Update stage error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update production stage' });
+  }
+});
+
 // Get inventory
 router.get('/inventory', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
