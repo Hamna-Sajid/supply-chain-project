@@ -191,10 +191,11 @@ export default function FinishedGoodsInventory() {
                                   <input
                                     type="number"
                                     step="0.01"
-                                    value={editingPrices[item.inventory_id] ?? (item.cost_price || 0)}
-                                    onChange={(e) =>
-                                      setEditingPrices({ ...editingPrices, [item.inventory_id]: parseFloat(e.target.value) })
-                                    }
+                                    value={String(editingPrices[item.inventory_id] ?? (item.cost_price || 0))}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value)
+                                      setEditingPrices({ ...editingPrices, [item.inventory_id]: isNaN(value) ? 0 : value })
+                                    }}
                                     className="border rounded px-2 py-1 w-20 text-sm"
                                   />
                                   <button
