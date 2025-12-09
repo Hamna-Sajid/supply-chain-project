@@ -67,9 +67,13 @@ export default function FinishedGoodsInventory() {
     if (newPrice === undefined || newPrice === null) return
 
     try {
-      const res = await fetch(`/api/manufacturer/inventory/${inventoryId}`, {
+      const token = localStorage.getItem("token")
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/manufacturer/inventory/${inventoryId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ cost_price: newPrice }),
       })
 
