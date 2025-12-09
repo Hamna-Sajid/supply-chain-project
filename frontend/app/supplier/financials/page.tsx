@@ -219,8 +219,8 @@ export default function FinancialsPage() {
                         </thead>
                         <tbody>
                           {revenue.length > 0 ? (
-                            revenue.map((transaction) => (
-                              <tr key={transaction.id} className="border-b hover:bg-gray-50">
+                            revenue.map((transaction, index) => (
+                              <tr key={`revenue-${transaction.id}-${index}`} className="border-b hover:bg-gray-50">
                                 <td className="py-3 px-4 font-medium text-blue-600">{transaction.id}</td>
                                 <td className="py-3 px-4 font-semibold text-green-600">${transaction.amount.toLocaleString()}</td>
                                 <td className="py-3 px-4 text-gray-600">{transaction.source}</td>
@@ -278,8 +278,8 @@ export default function FinancialsPage() {
                           </thead>
                           <tbody>
                             {expenses.length > 0 ? (
-                              expenses.map((expense) => (
-                                <tr key={expense.id} className="border-b hover:bg-gray-50">
+                              expenses.map((expense, index) => (
+                                <tr key={`expense-${expense.id}-${index}`} className="border-b hover:bg-gray-50">
                                   <td className="py-3 px-4 font-medium">{expense.id}</td>
                                   <td className="py-3 px-4"><Badge className="bg-blue-100 text-blue-800">{expense.category}</Badge></td>
                                   <td className="py-3 px-4 font-semibold text-red-600">${expense.amount.toLocaleString()}</td>
