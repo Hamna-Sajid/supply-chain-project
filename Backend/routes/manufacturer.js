@@ -681,11 +681,35 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
     // If no items inserted and we have an error
     if (lastError) {
       console.error(`❌ Failed to insert any items for order ${orderData.order_id}`);
+      console.error('Error code:', lastError.code);
+      
+      // Check for foreign key constraint violation
+      if (lastError.code === '23503' || lastError.message?.includes('foreign key')) {
+        return res.status(500).json({ 
+          error: 'Failed to create order items',
+          message: 'Foreign key constraint violated. The order_items table may have incorrect constraints. Please run SIMPLE_CREATE_ORDER_ITEMS.sql to recreate it.',
+          code: lastError.code,
+          hint: 'Run the DROP/CREATE SQL in SIMPLE_CREATE_ORDER_ITEMS.sql in Supabase SQL Editor',
+          details: lastError.details
+        });
+      }
+      
+      // Check if it's a "relation does not exist" error
+      if (lastError.code === 'PGRST301' || lastError.message?.includes('does not exist')) {
+        return res.status(500).json({ 
+          error: 'Failed to create order items',
+          message: 'order_items table does not exist. See SIMPLE_CREATE_ORDER_ITEMS.sql to create it.',
+          code: lastError.code,
+          hint: 'Run the SQL in SIMPLE_CREATE_ORDER_ITEMS.sql in Supabase SQL Editor',
+          details: lastError.details
+        });
+      }
+      
       return res.status(500).json({ 
         error: 'Failed to create order items',
         message: lastError.message,
         code: lastError.code,
-        hint: lastError.hint || 'Check if order_items table exists and has correct schema',
+        hint: lastError.hint || 'Check database schema, permissions, and RLS policies',
         details: lastError.details
       });
     }
@@ -712,10 +736,10 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
         total_amount,
         users!orders_delivered_by_fkey(name),
         order_items(
+          order_item_id,
           product_id,
           quantity,
-          unit_price,
-          products(product_name)
+          unit_price
         )
       `)
       .eq('ordered_by', req.user.userId)
@@ -734,10 +758,10 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
         }, 0);
       }
 
-      // Format order items with product and material names
+      // Format order items - product_id stores the material_id
       const formattedItems = (order.order_items || []).map(item => ({
-        product_id: item.product_id,
-        product_name: item.products?.product_name || 'Unknown Product',
+        order_item_id: item.order_item_id,
+        product_id: item.product_id,  // This is the material_id
         quantity: item.quantity,
         unit_price: item.unit_price
       }));
