@@ -404,12 +404,16 @@ export default function FinishedGoodsInventory() {
                               )}
                             </td>
                             <td className="py-3 px-4">
-                              <button
-                                onClick={() => handleOpenShipmentModal(item.inventory_id, item.product_id)}
-                                className="text-xs px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
-                              >
-                                Send Shipment
-                              </button>
+                              {item.quantity_available > item.reorder_level ? (
+                                <button
+                                  onClick={() => handleOpenShipmentModal(item.inventory_id, item.product_id)}
+                                  className="text-xs px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+                                >
+                                  Send Shipment
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400">Reorder level reached</span>
+                              )}
                             </td>
                           </tr>
                         )
