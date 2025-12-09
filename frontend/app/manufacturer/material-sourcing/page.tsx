@@ -108,7 +108,9 @@ export default function MaterialSourcing() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to place order")
+        console.error("Full error response:", errorData)
+        const errorMessage = errorData.message || errorData.error || "Failed to place order"
+        throw new Error(errorMessage)
       }
 
       setShowOrderModal(false)
