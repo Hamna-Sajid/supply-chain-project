@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Menu, X, LogOut } from "lucide-react"
+import { Menu, X, LogOut, LayoutDashboard, PackageOpen, BarChart3, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
-  { label: "Dashboard", id: "dashboard", icon: "🏠" },
-  { label: "Incoming Shipments", id: "shipments", icon: "📦" },
-  { label: "Inventory Management", id: "inventory", icon: "📊" },
-  { label: "Order Fulfillment", id: "orders", icon: "🚚" },
+  { label: "Dashboard", id: "dashboard", icon: LayoutDashboard },
+  { label: "Incoming Shipments", id: "shipments", icon: PackageOpen },
+  { label: "Inventory Management", id: "inventory", icon: BarChart3 },
+  { label: "Order Fulfillment", id: "orders", icon: Truck },
 ]
 
 export function WarehouseSidebar() {
@@ -65,20 +65,23 @@ export function WarehouseSidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id)}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                activeTab === item.id
-                  ? "bg-white/20 text-white"
-                  : "text-white/80 hover:bg-white/10"
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              <span className="text-sm font-medium">{item.label}</span>
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id)}
+                className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  activeTab === item.id
+                    ? "bg-white/20 text-white"
+                    : "text-white/80 hover:bg-white/10"
+                }`}
+              >
+                <Icon size={18} />
+                <span className="text-sm font-medium">{item.label}</span>
+              </button>
+            )
+          })}
         </nav>
 
         <div className="p-4 border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }}>

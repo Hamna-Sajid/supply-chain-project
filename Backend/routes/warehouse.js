@@ -193,7 +193,7 @@ router.get('/inventory/low-stock', authenticateToken, checkWarehouseRole, async 
         reorder_level,
         products(product_name, category)
       `)
-      .eq('warehouse_id', req.user.userId);
+      .eq('user_id', req.user.userId);
 
     if (error) throw error;
 
@@ -294,17 +294,20 @@ router.get('/dashboard', authenticateToken, checkWarehouseRole, async (req, res)
   try {
     console.log(`Fetching dashboard for warehouse: ${req.user.userId}`);
 
-    // Get incoming shipments count
+    // Get incoming shipments count for this warehouse (exclude delivered, accepted, rejected)
     const { data: shipmentsData, error: shipmentsError } = await supabase
       .from('shipments')
       .select('shipment_id')
+      .eq('whm_id', req.user.userId)
+      .neq('status', 'delivered')
       .neq('status', 'accepted')
       .neq('status', 'rejected');
 
-    // Get inventory value
+    // Get inventory value for this warehouse
     const { data: inventoryData, error: inventoryError } = await supabase
       .from('inventory')
-      .select('quantity_available, cost_price');
+      .select('quantity_available, cost_price')
+      .eq('user_id', req.user.userId);
 
     // Get pending orders count
     const { data: ordersData, error: ordersError } = await supabase
