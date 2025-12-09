@@ -11,7 +11,7 @@ BEGIN
   -- 1. New status is 'paid'
   -- 2. Old status was NOT 'paid' (prevents duplicates on multiple updates)
   IF NEW.status = 'paid' AND (OLD.status IS NULL OR OLD.status != 'paid') THEN
-    INSERT INTO revenues (
+    INSERT INTO revenue (
       user_id,
       amount,
       source,
