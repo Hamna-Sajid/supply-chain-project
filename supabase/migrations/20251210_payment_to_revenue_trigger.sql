@@ -10,12 +10,10 @@ BEGIN
     INSERT INTO revenue (
       user_id,
       amount,
-      source,
       created_at
     ) VALUES (
       NEW.user_id,
       NEW.amount,
-      'Payment - Order #' || NEW.order_id,
       NOW()
     );
   END IF;
