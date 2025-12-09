@@ -63,9 +63,18 @@ BEGIN
       VALUES (NEW.product_id, NEW.whm_id, NEW.quantity, COALESCE(product_data.cost_price, 0), COALESCE(product_data.selling_price, 0), 10);
     END IF;
     
+    -- Decrease manufacturer's finished goods inventory when shipment is delivered
+    UPDATE inventory
+    SET quantity_available = quantity_available - NEW.quantity
+    WHERE product_id = NEW.product_id 
+    AND user_id = NEW.manufacturer_id
+    AND quantity_available >= NEW.quantity;
+    
     -- Log the update
     RAISE NOTICE 'Increased inventory for product % by % units for warehouse %', 
       NEW.product_id, NEW.quantity, NEW.whm_id;
+    RAISE NOTICE 'Decreased finished goods for product % by % units for manufacturer %', 
+      NEW.product_id, NEW.quantity, NEW.manufacturer_id;
   END IF;
   
   RETURN NEW;
@@ -91,5 +100,6 @@ EXECUTE FUNCTION increase_inventory_on_shipment_delivered();
 --    - The warehouse's inventory for that product increases by the shipment quantity
 --    - If warehouse doesn't have the product in inventory, a new entry is created
 --    - Cost price and selling price are copied from the product master data
+--    - The manufacturer's finished goods inventory DECREASES by the shipment quantity
 -- ============================================
 
