@@ -526,6 +526,45 @@ router.get('/shipments', authenticateToken, checkManufacturerRole, async (req, r
   }
 });
 
+// Update shipment status (in_transit or delivered)
+router.put('/shipments/:id/status', authenticateToken, checkManufacturerRole, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const userId = req.user.userId;
+
+  if (!['in_transit', 'delivered'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only in_transit and delivered are allowed.' });
+  }
+
+  try {
+    // Check if user is manufacturer for this shipment
+    const { data: shipment, error: fetchError } = await supabase
+      .from('shipments')
+      .select('*')
+      .eq('shipment_id', id)
+      .eq('manufacturer_id', userId)
+      .single();
+
+    if (fetchError || !shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status })
+      .eq('shipment_id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ message: `Shipment status updated to ${status}`, shipment: data });
+  } catch (error) {
+    console.error('Update shipment status error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Place order for raw materials
 router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   const { supplier_id, items } = req.body;

@@ -56,7 +56,7 @@ router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async
   try {
     const { data, error } = await supabase
       .from('shipments')
-      .update({ status: 'delivered' })
+      .update({ status: 'accepted' })
       .eq('shipment_id', id)
       .eq('whm_id', req.user.userId)
       .select()
@@ -68,7 +68,7 @@ router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    res.json({ message: 'Shipment accepted and marked as delivered' });
+    res.json({ message: 'Shipment accepted' });
   } catch (error) {
     console.error('Accept shipment error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -80,17 +80,66 @@ router.put('/shipments/:id/reject', authenticateToken, checkWarehouseRole, async
   const { id } = req.params;
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('shipments')
-      .delete()
+      .update({ status: 'rejected' })
       .eq('shipment_id', id)
-      .eq('whm_id', req.user.userId);
+      .eq('whm_id', req.user.userId)
+      .select()
+      .single();
 
     if (error) throw error;
 
-    res.json({ message: 'Shipment rejected and deleted' });
+    if (!data) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    res.json({ message: 'Shipment rejected' });
   } catch (error) {
     console.error('Reject shipment error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update shipment status (in_transit or delivered)
+router.put('/shipments/:id/status', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const userId = req.user.userId;
+
+  if (!['in_transit', 'delivered'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only in_transit and delivered are allowed.' });
+  }
+
+  try {
+    // Check if user is manufacturer or warehouse for this shipment
+    const { data: shipment, error: fetchError } = await supabase
+      .from('shipments')
+      .select('*')
+      .eq('shipment_id', id)
+      .single();
+
+    if (fetchError || !shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Verify user owns this shipment (manufacturer or warehouse)
+    if (shipment.manufacturer_id !== userId && shipment.whm_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status })
+      .eq('shipment_id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ message: `Shipment status updated to ${status}`, shipment: data });
+  } catch (error) {
+    console.error('Update shipment status error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
