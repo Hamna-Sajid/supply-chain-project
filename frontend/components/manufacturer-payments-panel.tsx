@@ -26,8 +26,6 @@ interface PaymentData {
 const paymentStatusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   paid: "bg-green-100 text-green-800",
-  unpaid: "bg-red-100 text-red-800",
-  failed: "bg-red-100 text-red-800",
 }
 
 const capitalizeStatus = (status: string | null | undefined) => {
@@ -146,8 +144,6 @@ export function ManufacturerPaymentsPanel() {
       total: payments.length,
       pending: payments.filter(p => p.payment.payment_status === 'pending').length,
       paid: payments.filter(p => p.payment.payment_status === 'paid').length,
-      unpaid: payments.filter(p => p.payment.payment_status === 'unpaid').length,
-      failed: payments.filter(p => p.payment.payment_status === 'failed').length,
     }
   }
 
@@ -156,7 +152,7 @@ export function ManufacturerPaymentsPanel() {
   return (
     <div className="space-y-6">
       {/* Payment Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -180,26 +176,8 @@ export function ManufacturerPaymentsPanel() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">{stats.paid}</p>
+              <p className="text-3xl font-bold text-green-600">{stats.paid}</p>
               <p className="text-xs text-gray-600 mt-1">Paid</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-orange-600">{stats.unpaid}</p>
-              <p className="text-xs text-gray-600 mt-1">Unpaid</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-red-600">{stats.failed}</p>
-              <p className="text-xs text-gray-600 mt-1">Failed</p>
             </div>
           </CardContent>
         </Card>
@@ -362,8 +340,6 @@ export function ManufacturerPaymentsPanel() {
                   <option value="">Select new status</option>
                   <option value="pending">Pending</option>
                   <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="failed">Failed</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-4">

@@ -42,7 +42,7 @@ const getValidStatus = (status) => {
 const checkSupplierRole = (req, res, next) => {
   console.log('checkSupplierRole - user:', req.user);
   console.log('checkSupplierRole - role:', req.user?.role);
-  
+
   if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('supplier')) {
     console.log('Access denied - role check failed');
     return res.status(403).json({ error: 'Access denied for this role' });
@@ -53,22 +53,22 @@ const checkSupplierRole = (req, res, next) => {
 // Add raw material
 router.post('/materials', authenticateToken, checkSupplierRole, async (req, res) => {
   const { material_name, description, quantity_available, unit_price } = req.body;
-  
+
   try {
     const { data, error } = await supabase
       .from('raw_materials')
-      .insert([{ 
-        material_name, 
-        description, 
-        quantity_available, 
-        unit_price, 
-        supplier_id: req.user.userId 
+      .insert([{
+        material_name,
+        description,
+        quantity_available,
+        unit_price,
+        supplier_id: req.user.userId
       }])
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     res.status(201).json(data);
   } catch (error) {
     console.error('Add material error:', error);
@@ -83,9 +83,9 @@ router.get('/materials', authenticateToken, checkSupplierRole, async (req, res) 
       .from('raw_materials')
       .select('*')
       .eq('supplier_id', req.user.userId);
-    
+
     if (error) throw error;
-    
+
     res.json({ materials: data });
   } catch (error) {
     console.error('Get materials error:', error);
@@ -97,7 +97,7 @@ router.get('/materials', authenticateToken, checkSupplierRole, async (req, res) 
 router.put('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { material_name, description, quantity_available, unit_price } = req.body;
-  
+
   try {
     const { data, error } = await supabase
       .from('raw_materials')
@@ -111,13 +111,13 @@ router.put('/materials/:id', authenticateToken, checkSupplierRole, async (req, r
       .eq('supplier_id', req.user.userId)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     if (!data) {
       return res.status(404).json({ error: 'Material not found' });
     }
-    
+
     res.json(data);
   } catch (error) {
     console.error('Update material error:', error);
@@ -137,36 +137,70 @@ router.get('/orders', authenticateToken, checkSupplierRole, async (req, res) => 
         total_amount,
         users!orders_ordered_by_fkey(name),
         order_items(
-          product_id, 
+          product_id,
           quantity, 
-          unit_price,
-          products(product_name)
+          unit_price
         )
       `)
       .eq('delivered_by', req.user.userId)
       .order('order_date', { ascending: false });
-    
-    if (error) throw error;
-    
+
+    if (error) {
+      console.error('Get orders error:', error);
+      throw error;
+    }
+
+    console.log('Orders data from DB:', JSON.stringify(data, null, 2));
+
     // Use total_amount from database, fallback to calculated total from order_items
-    const ordersFormatted = (data || []).map(order => {
+    const ordersFormatted = await Promise.all((data || []).map(async (order) => {
       let total = order.total_amount || 0;
-      
-      // If total_amount is 0, calculate from order_items
-      if (total === 0 && order.order_items && order.order_items.length > 0) {
+
+      // If total_amount is 0 or null, calculate from order_items
+      if (!total && order.order_items && order.order_items.length > 0) {
         total = (order.order_items || []).reduce((sum, item) => {
-          return sum + (item.quantity * item.unit_price);
+          return sum + ((item.quantity || 0) * (item.unit_price || 0));
         }, 0);
       }
-      
-      // Format order items with product names
-      const formattedItems = (order.order_items || []).map(item => ({
-        product_id: item.product_id,
-        product_name: item.products?.product_name || 'Unknown Product',
-        quantity: item.quantity,
-        unit_price: item.unit_price
+
+      // Format order items - try to get material/product names
+      const formattedItems = await Promise.all((order.order_items || []).map(async (item) => {
+        let itemName = 'Unknown Item';
+
+        if (item.product_id) {
+          // Try raw_materials table first
+          const { data: materialData } = await supabase
+            .from('raw_materials')
+            .select('material_name')
+            .eq('material_id', item.product_id)
+            .single();
+
+          if (materialData?.material_name) {
+            itemName = materialData.material_name;
+          } else {
+            // Fallback to products table
+            const { data: productData } = await supabase
+              .from('products')
+              .select('product_name')
+              .eq('product_id', item.product_id)
+              .single();
+
+            if (productData?.product_name) {
+              itemName = productData.product_name;
+            }
+          }
+        }
+
+        return {
+          product_id: item.product_id,
+          product_name: itemName,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        };
       }));
-      
+
+      console.log(`Order ${order.order_id}: total_amount=${order.total_amount}, calculated=${total}`);
+
       return {
         order_id: order.order_id,
         order_date: order.order_date,
@@ -175,8 +209,9 @@ router.get('/orders', authenticateToken, checkSupplierRole, async (req, res) => 
         order_items: formattedItems,
         total_amount: total
       };
-    });
-    
+    }));
+
+    console.log('Formatted orders:', JSON.stringify(ordersFormatted, null, 2));
     res.json({ orders: ordersFormatted });
   } catch (error) {
     console.error('Get orders error:', error);
@@ -188,14 +223,14 @@ router.get('/orders', authenticateToken, checkSupplierRole, async (req, res) => 
 router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  
+
   try {
     // Convert status to lowercase to match database constraint
     const normalizedStatus = status.toLowerCase();
-    
+
     const { data, error } = await supabase
       .from('orders')
-      .update({ 
+      .update({
         order_status: normalizedStatus,
         updated_at: new Date().toISOString()
       })
@@ -203,13 +238,13 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
       .eq('delivered_by', req.user.userId)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     if (!data) {
       return res.status(404).json({ error: 'Order not found' });
     }
-    
+
     res.json({ ...data, order_status: data.order_status });
   } catch (error) {
     console.error('Update order status error:', error);
@@ -245,15 +280,14 @@ router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) 
       .select('rating_value')
       .eq('given_to', userId);
 
-    // Pending orders count
-    const { data: pendingData, error: pendingError } = await supabase
+    // Get all orders to count by status
+    const { data: allOrdersData, error: allOrdersError } = await supabase
       .from('orders')
-      .select('order_id')
-      .eq('delivered_by', userId)
-      .neq('order_status', 'delivered');
+      .select('order_id, order_status')
+      .eq('delivered_by', userId);
 
-    if (revenueError || expenseError || ratingError || pendingError) {
-      throw revenueError || expenseError || ratingError || pendingError;
+    if (revenueError || expenseError || ratingError || allOrdersError) {
+      throw revenueError || expenseError || ratingError || allOrdersError;
     }
 
     const totalRevenue = (revenueData || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
@@ -263,13 +297,25 @@ router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) 
       return sum + (parseFloat(amount) || 0);
     }, 0);
     const ratings = ratingData || [];
-    const avgRating = ratings.length > 0 
+    const avgRating = ratings.length > 0
       ? (ratings.reduce((sum, item) => sum + item.rating_value, 0) / ratings.length).toFixed(1)
       : 0;
     const totalRatings = ratings.length;
-    const pendingCount = (pendingData || []).length;
+
+    // Count orders by status
+    const orderStatusCounts = (allOrdersData || []).reduce((acc, order) => {
+      const status = order.order_status || 'unknown';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const pendingCount = (orderStatusCounts['pending'] || 0) + (orderStatusCounts['processing'] || 0);
+    const deliveredCount = orderStatusCounts['delivered'] || 0;
+    const cancelledCount = orderStatusCounts['cancelled'] || 0;
+    const totalOrders = (allOrdersData || []).length;
 
     console.log('Total expense calculated:', totalExpense);
+    console.log('Order status counts:', orderStatusCounts);
 
     res.json({
       total_revenue: totalRevenue,
@@ -277,7 +323,11 @@ router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) 
       net_profit: totalRevenue - totalExpense,
       average_rating: parseFloat(avgRating),
       total_ratings: totalRatings,
-      pending_orders_count: pendingCount
+      pending_orders_count: pendingCount,
+      delivered_orders_count: deliveredCount,
+      cancelled_orders_count: cancelledCount,
+      total_orders_count: totalOrders,
+      order_status_breakdown: orderStatusCounts
     });
   } catch (error) {
     console.error('Dashboard error:', error);
@@ -320,19 +370,19 @@ router.get('/ratings', authenticateToken, checkSupplierRole, async (req, res) =>
 router.get('/materials/stock/overview', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
     console.log(`Fetching materials for supplier: ${req.user.userId}`);
-    
+
     const { data, error } = await supabase
       .from('raw_materials')
       .select('material_id, material_name, quantity_available')
       .eq('supplier_id', req.user.userId)
       .order('quantity_available', { ascending: false })
       .limit(5);
-    
+
     if (error) {
       console.error('Material stock error:', error);
       throw error;
     }
-    
+
     console.log(`Found ${(data || []).length} materials for supplier ${req.user.userId}`);
     res.json({ materials: data || [] });
   } catch (error) {
@@ -344,7 +394,7 @@ router.get('/materials/stock/overview', authenticateToken, checkSupplierRole, as
 // Delete material
 router.delete('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const { data, error } = await supabase
       .from('raw_materials')
@@ -353,13 +403,13 @@ router.delete('/materials/:id', authenticateToken, checkSupplierRole, async (req
       .eq('supplier_id', req.user.userId)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     if (!data) {
       return res.status(404).json({ error: 'Material not found' });
     }
-    
+
     res.json({ message: 'Material deleted successfully' });
   } catch (error) {
     console.error('Delete material error:', error);
@@ -382,10 +432,18 @@ router.get('/orders/pending', authenticateToken, checkSupplierRole, async (req, 
       .eq('delivered_by', req.user.userId)
       .in('order_status', ['pending', 'processing'])
       .order('order_date', { ascending: false });
-    
+
     if (error) throw error;
-    
-    res.json(data);
+
+    // Transform data to match frontend expectations
+    const orders = (data || []).map(order => ({
+      id: order.order_id,
+      manufacturer_name: order.users?.name || 'Unknown',
+      total_amount: order.total_amount || 0,
+      status: order.order_status
+    }));
+
+    res.json({ orders });
   } catch (error) {
     console.error('Get pending orders error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -400,9 +458,9 @@ router.get('/notifications', authenticateToken, checkSupplierRole, async (req, r
       .select('*')
       .eq('user_id', req.user.userId)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
-    
+
     res.json({ notifications: data || [] });
   } catch (error) {
     console.error('Get notifications error:', error);
@@ -417,12 +475,12 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
       .from('revenue')
       .select('*')
       .eq('user_id', req.user.userId);
-    
+
     if (error) {
       console.error('Supabase error:', error);
       throw error;
     }
-    
+
     // Transform created_at to date for frontend consistency
     const revenues = (data || []).map(rev => ({
       id: rev.id,
@@ -430,7 +488,7 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
       source: rev.source,
       date: rev.created_at
     }));
-    
+
     res.json({ revenue: revenues });
   } catch (error) {
     console.error('Get revenue error:', error);
@@ -445,12 +503,12 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
       .from('expense')
       .select('*')
       .eq('user_id', req.user.userId);
-    
+
     if (error) {
       console.error('Supabase error:', error);
       throw error;
     }
-    
+
     // Transform expense_id to id and created_at to date for frontend consistency
     const expenses = (data || []).map(exp => ({
       id: exp.expense_id,
@@ -458,7 +516,7 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
       category: exp.category,
       date: exp.created_at
     }));
-    
+
     res.json({ expenses });
   } catch (error) {
     console.error('Get expenses error:', error);
@@ -469,7 +527,7 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
 // Add expense
 router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
   const { amount, category } = req.body;
-  
+
   try {
     const { data, error } = await supabase
       .from('expense')
@@ -480,9 +538,9 @@ router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) 
       }])
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     // Map expense_id to id and created_at to date for frontend consistency
     const expense = {
       id: data.expense_id,
@@ -490,7 +548,7 @@ router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) 
       category: data.category,
       date: data.created_at
     };
-    
+
     res.status(201).json(expense);
   } catch (error) {
     console.error('Add expense error:', error);
@@ -501,7 +559,7 @@ router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) 
 // Delete expense
 router.delete('/expenses/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const { data, error } = await supabase
       .from('expense')
@@ -510,13 +568,13 @@ router.delete('/expenses/:id', authenticateToken, checkSupplierRole, async (req,
       .eq('user_id', req.user.userId)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     if (!data) {
       return res.status(404).json({ error: 'Expense not found' });
     }
-    
+
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
     console.error('Delete expense error:', error);

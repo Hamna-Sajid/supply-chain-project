@@ -186,7 +186,11 @@ export default function ManufacturerOrdersPage() {
                         </thead>
                         <tbody>
                           {filteredOrders.map((order) => (
-                            <tr key={order.order_id} className="border-b hover:bg-gray-50 cursor-pointer">
+                            <tr 
+                              key={order.order_id} 
+                              className="border-b hover:bg-gray-50 cursor-pointer"
+                              onClick={() => setSelectedOrder(order)}
+                            >
                               <td className="py-3 px-4 font-medium text-blue-600">{order.order_id}</td>
                               <td className="py-3 px-4">{order.manufacturer || "Unknown"}</td>
                               <td className="py-3 px-4">
@@ -200,7 +204,8 @@ export default function ManufacturerOrdersPage() {
                                 <Button
                                   size="sm"
                                   style={{ backgroundColor: "#018790", color: "white" }}
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation()
                                     setSelectedOrder(order)
                                     setNewStatus(order.order_status)
                                     setShowStatusModal(true)
@@ -256,12 +261,32 @@ export default function ManufacturerOrdersPage() {
 
                         {selectedOrder.order_items && selectedOrder.order_items.length > 0 && (
                           <div>
-                            <p className="text-xs font-semibold text-gray-600 mb-2">ITEMS</p>
-                            <div className="bg-gray-50 rounded-md p-3 space-y-2">
-                              {selectedOrder.order_items.map((item) => (
-                                <div key={item.product_id} className="text-sm border-b pb-2">
-                                  <p className="font-medium">{item.product_name}</p>
-                                  <p className="text-gray-600">Qty: {item.quantity} × ${item.unit_price.toFixed(2)}</p>
+                            <p className="text-xs font-semibold text-gray-600 mb-2">ORDER ITEMS</p>
+                            <div className="bg-gray-50 rounded-md p-3 space-y-3">
+                              {selectedOrder.order_items.map((item, index) => (
+                                <div key={item.product_id || index} className="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between items-start">
+                                      <p className="font-semibold text-gray-800">{item.product_name}</p>
+                                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                        ID: {item.product_id}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Quantity:</span>
+                                      <span className="font-medium">{item.quantity}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-600">Unit Price:</span>
+                                      <span className="font-medium">${item.unit_price.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm pt-1 border-t border-gray-300">
+                                      <span className="text-gray-700 font-medium">Subtotal:</span>
+                                      <span className="font-bold text-green-600">
+                                        ${(item.quantity * item.unit_price).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>

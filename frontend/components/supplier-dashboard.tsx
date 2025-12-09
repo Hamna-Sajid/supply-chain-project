@@ -26,6 +26,10 @@ interface DashboardData {
   net_profit: number
   average_rating: number
   pending_orders_count: number
+  delivered_orders_count: number
+  cancelled_orders_count: number
+  total_orders_count: number
+  order_status_breakdown?: Record<string, number>
 }
 
 interface MaterialStock {
@@ -221,9 +225,7 @@ export function SupplierDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-[#005461]">
-                  ${typeof dashboardData?.total_expenses === 'number' 
-                    ? (dashboardData.total_expenses || 0).toLocaleString() 
-                    : (parseInt(dashboardData?.total_expenses) || 0).toLocaleString()}
+                  ${(dashboardData?.total_expenses || 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-600 mt-2">All recorded expenses</p>
               </CardContent>
@@ -355,7 +357,7 @@ export function SupplierDashboard() {
               </CardContent>
             </Card>
 
-            {/* Pending Orders Count */}
+            {/* Orders Summary */}
             <Card className="bg-white border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-[#005461]">Orders Summary</CardTitle>
@@ -363,13 +365,32 @@ export function SupplierDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600">Pending Orders</p>
-                    <p className="text-3xl font-bold text-[#018790]">
-                      {dashboardData?.pending_orders_count || 0}
+                    <p className="text-sm text-gray-600">Total Orders</p>
+                    <p className="text-3xl font-bold text-[#005461]">
+                      {dashboardData?.total_orders_count || 0}
                     </p>
                   </div>
                   <hr />
-                  <p className="text-xs text-gray-500">Displayed on the left table above</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Pending/Processing</span>
+                      <span className="font-semibold text-yellow-600">
+                        {dashboardData?.pending_orders_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Delivered</span>
+                      <span className="font-semibold text-green-600">
+                        {dashboardData?.delivered_orders_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Cancelled</span>
+                      <span className="font-semibold text-red-600">
+                        {dashboardData?.cancelled_orders_count || 0}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

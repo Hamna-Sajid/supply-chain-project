@@ -80,10 +80,10 @@ router.get('/dashboard', authenticateToken, checkManufacturerRole, async (req, r
 
     // Products in production (those not yet completed)
     const totalProduction = (productionData || []).length;
-    
+
     // Finished goods stock (sum of all inventory quantities)
     const totalInventory = (inventoryData || []).reduce((sum, i) => sum + (i.quantity_available || 0), 0);
-    
+
     const totalOrders = (ordersData || []).length;
     const totalShipments = (shipmentsData || []).length;
 
@@ -113,12 +113,12 @@ router.get('/raw-materials', authenticateToken, checkManufacturerRole, async (re
 
     console.log('Raw materials found:', data?.length || 0);
     console.log('Raw materials sample:', JSON.stringify(data?.[0], null, 2));
-    
+
     // Fetch supplier names for each material
     const materialsWithSuppliers = await Promise.all(
       (data || []).map(async (material) => {
         let supplierName = 'Unknown Supplier';
-        
+
         // Try to get supplier from supplier_id if it exists
         if (material.supplier_id) {
           try {
@@ -128,9 +128,9 @@ router.get('/raw-materials', authenticateToken, checkManufacturerRole, async (re
               .select('name')
               .eq('user_id', material.supplier_id)
               .single();
-            
+
             console.log(`Supplier lookup result:`, { supplierData, supplierError });
-            
+
             if (!supplierError && supplierData?.name) {
               supplierName = supplierData.name;
               console.log(`Found supplier name: ${supplierName}`);
@@ -143,7 +143,7 @@ router.get('/raw-materials', authenticateToken, checkManufacturerRole, async (re
         } else {
           console.log(`No supplier_id for material: ${material.material_name}`);
         }
-        
+
         return {
           ...material,
           supplier_name: supplierName,
@@ -311,7 +311,7 @@ router.put('/products/:id/quantity', authenticateToken, checkManufacturerRole, a
       // Update existing inventory
       const { data, error } = await supabase
         .from('inventory')
-        .update({ 
+        .update({
           quantity_available: quantity,
           cost_price: product.cost_price,
           selling_price: product.selling_price
@@ -576,14 +576,22 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       return res.status(400).json({ error: 'supplier_id and items are required' });
     }
 
-    // Create order
+    // Calculate total amount from items
+    const totalAmount = items.reduce((sum, item) => {
+      return sum + (parseFloat(item.unit_price || 0) * parseInt(item.quantity || 0));
+    }, 0);
+
+    console.log('Calculated total amount:', totalAmount);
+
+    // Create order with total_amount
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert([{
         ordered_by: req.user.userId,
         delivered_by: supplier_id,
         order_status: 'pending',
-        order_date: new Date().toISOString()
+        order_date: new Date().toISOString(),
+        total_amount: totalAmount
       }])
       .select()
       .single();
@@ -595,31 +603,30 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
 
     console.log('Order created:', orderData);
 
-    // Add order items - try using material_id column if product_id doesn't work
+    // Add order items - use product_id column (stores material_id for raw material orders)
     for (const item of items) {
       console.log('Adding item to order:', { order_id: orderData.order_id, item });
-      
-      // First, try to use material_id directly
+
       const { error: itemError } = await supabase
         .from('order_items')
         .insert([{
           order_id: orderData.order_id,
-          material_id: item.material_id,
+          product_id: item.material_id,  // Store material_id in product_id column
           quantity: item.quantity,
           unit_price: item.unit_price
         }]);
 
       if (itemError) {
         console.error('Item insertion error:', itemError);
-        console.error('Item data attempted:', { order_id: orderData.order_id, material_id: item.material_id, quantity: item.quantity, unit_price: item.unit_price });
+        console.error('Item data attempted:', { order_id: orderData.order_id, product_id: item.material_id, quantity: item.quantity, unit_price: item.unit_price });
         throw itemError;
       }
     }
 
-    console.log('Order completed successfully');
-    res.status(201).json({ 
+    console.log('Order completed successfully with total amount:', totalAmount);
+    res.status(201).json({
       message: 'Order placed successfully',
-      order: orderData 
+      order: orderData
     });
   } catch (error) {
     console.error('Place order error:', error);
@@ -653,14 +660,14 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
     // Use total_amount from database, fallback to calculated total from order_items
     const ordersFormatted = (data || []).map(order => {
       let total = order.total_amount || 0;
-      
+
       // If total_amount is 0, calculate from order_items
       if (total === 0 && order.order_items && order.order_items.length > 0) {
         total = (order.order_items || []).reduce((sum, item) => {
           return sum + (item.quantity * item.unit_price);
         }, 0);
       }
-      
+
       // Format order items with product and material names
       const formattedItems = (order.order_items || []).map(item => ({
         product_id: item.product_id,
@@ -668,7 +675,7 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
         quantity: item.quantity,
         unit_price: item.unit_price
       }));
-      
+
       return {
         order_id: order.order_id,
         order_date: order.order_date,
