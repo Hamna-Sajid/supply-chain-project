@@ -187,7 +187,7 @@ export default function FinishedGoodsInventory() {
                                   <input
                                     type="number"
                                     step="0.01"
-                                    value={editingPrices[item.inventory_id] ?? item.cost_price}
+                                    value={editingPrices[item.inventory_id] ?? (item.cost_price || 0)}
                                     onChange={(e) =>
                                       setEditingPrices({ ...editingPrices, [item.inventory_id]: parseFloat(e.target.value) })
                                     }
@@ -211,11 +211,11 @@ export default function FinishedGoodsInventory() {
                                 </div>
                               ) : (
                                 <div className="flex gap-2 items-center">
-                                  ${item.cost_price?.toFixed(2)}
+                                  ${(item.cost_price || 0).toFixed(2)}
                                   <button
                                     onClick={() => {
                                       setEditingId(item.inventory_id)
-                                      setEditingPrices({ [item.inventory_id]: item.cost_price })
+                                      setEditingPrices({ [item.inventory_id]: item.cost_price || 0 })
                                     }}
                                     className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                                   >
