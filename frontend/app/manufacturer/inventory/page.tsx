@@ -24,6 +24,7 @@ export default function FinishedGoodsInventory() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<'cost_price' | 'selling_price' | null>(null)
   const [editingPrices, setEditingPrices] = useState<Record<string, number>>({})
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function FinishedGoodsInventory() {
     return "Normal"
   }
 
-  const handleUpdateCostPrice = async (inventoryId: string) => {
+  const handleUpdatePrice = async (inventoryId: string, field: 'cost_price' | 'selling_price') => {
     const newPrice = editingPrices[inventoryId]
     if (newPrice === undefined || newPrice === null) return
 
@@ -74,24 +75,25 @@ export default function FinishedGoodsInventory() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ cost_price: newPrice }),
+        body: JSON.stringify({ [field]: newPrice }),
       })
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || "Failed to update cost price")
+        setError(data.error || `Failed to update ${field}`)
         return
       }
 
       setInventory(
         inventory.map((item) =>
-          item.inventory_id === inventoryId ? { ...item, cost_price: newPrice } : item,
+          item.inventory_id === inventoryId ? { ...item, [field]: newPrice } : item,
         ),
       )
       setEditingId(null)
+      setEditingField(null)
       setEditingPrices({})
     } catch (err) {
-      setError("Failed to update cost price")
+      setError(`Failed to update ${field}`)
     }
   }
 
@@ -173,6 +175,9 @@ export default function FinishedGoodsInventory() {
                           Cost Price
                         </th>
                         <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
+                          Selling Price
+                        </th>
+                        <th className="text-left py-3 px-4 font-semibold" style={{ color: "#005461" }}>
                           Status
                         </th>
                       </tr>
@@ -186,7 +191,7 @@ export default function FinishedGoodsInventory() {
                             <td className="py-3 px-4">{item.quantity_available} units</td>
                             <td className="py-3 px-4">{item.reorder_level} units</td>
                             <td className="py-3 px-4">
-                              {editingId === item.inventory_id ? (
+                              {editingId === item.inventory_id && editingField === 'cost_price' ? (
                                 <div className="flex gap-2 items-center">
                                   <input
                                     type="number"
@@ -199,7 +204,7 @@ export default function FinishedGoodsInventory() {
                                     className="border rounded px-2 py-1 w-20 text-sm"
                                   />
                                   <button
-                                    onClick={() => handleUpdateCostPrice(item.inventory_id)}
+                                    onClick={() => handleUpdatePrice(item.inventory_id, 'cost_price')}
                                     className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
                                   >
                                     Save
@@ -207,6 +212,7 @@ export default function FinishedGoodsInventory() {
                                   <button
                                     onClick={() => {
                                       setEditingId(null)
+                                      setEditingField(null)
                                       setEditingPrices({})
                                     }}
                                     className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
@@ -220,7 +226,54 @@ export default function FinishedGoodsInventory() {
                                   <button
                                     onClick={() => {
                                       setEditingId(item.inventory_id)
+                                      setEditingField('cost_price')
                                       setEditingPrices({ [item.inventory_id]: item.cost_price || 0 })
+                                    }}
+                                    className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingId === item.inventory_id && editingField === 'selling_price' ? (
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={String(editingPrices[item.inventory_id] ?? (item.selling_price || 0))}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value)
+                                      setEditingPrices({ ...editingPrices, [item.inventory_id]: isNaN(value) ? 0 : value })
+                                    }}
+                                    className="border rounded px-2 py-1 w-20 text-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleUpdatePrice(item.inventory_id, 'selling_price')}
+                                    className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(null)
+                                      setEditingField(null)
+                                      setEditingPrices({})
+                                    }}
+                                    className="text-xs px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2 items-center">
+                                  ${(item.selling_price || 0).toFixed(2)}
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(item.inventory_id)
+                                      setEditingField('selling_price')
+                                      setEditingPrices({ [item.inventory_id]: item.selling_price || 0 })
                                     }}
                                     className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                                   >

@@ -354,14 +354,25 @@ router.put('/products/:id/quantity', authenticateToken, checkManufacturerRole, a
 router.put('/inventory/:id', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
     const { id } = req.params;
-    const { cost_price } = req.body;
+    const { cost_price, selling_price } = req.body;
 
-    if (cost_price === undefined || cost_price === null) {
-      return res.status(400).json({ error: 'cost_price is required' });
+    // At least one of cost_price or selling_price must be provided
+    if ((cost_price === undefined || cost_price === null) && (selling_price === undefined || selling_price === null)) {
+      return res.status(400).json({ error: 'cost_price or selling_price is required' });
     }
 
-    if (isNaN(cost_price) || cost_price < 0) {
-      return res.status(400).json({ error: 'cost_price must be a valid non-negative number' });
+    // Validate cost_price if provided
+    if (cost_price !== undefined && cost_price !== null) {
+      if (isNaN(cost_price) || cost_price < 0) {
+        return res.status(400).json({ error: 'cost_price must be a valid non-negative number' });
+      }
+    }
+
+    // Validate selling_price if provided
+    if (selling_price !== undefined && selling_price !== null) {
+      if (isNaN(selling_price) || selling_price < 0) {
+        return res.status(400).json({ error: 'selling_price must be a valid non-negative number' });
+      }
     }
 
     // Verify inventory belongs to manufacturer
@@ -376,17 +387,26 @@ router.put('/inventory/:id', authenticateToken, checkManufacturerRole, async (re
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
-    // Update cost price
+    // Build update object
+    const updateObj = {};
+    if (cost_price !== undefined && cost_price !== null) {
+      updateObj.cost_price = cost_price;
+    }
+    if (selling_price !== undefined && selling_price !== null) {
+      updateObj.selling_price = selling_price;
+    }
+
+    // Update the fields
     const { error } = await supabase
       .from('inventory')
-      .update({ cost_price })
+      .update(updateObj)
       .eq('inventory_id', id)
       .eq('user_id', req.user.userId);
 
     if (error) throw error;
 
-    console.log('Inventory cost price updated:', id, 'new price:', cost_price);
-    res.json({ message: 'Cost price updated successfully', inventory_id: id, cost_price });
+    console.log('Inventory updated:', id, 'changes:', updateObj);
+    res.json({ message: 'Inventory updated successfully', inventory_id: id, ...updateObj });
   } catch (error) {
     console.error('Update inventory cost price error:', error);
     res.status(500).json({ error: error.message || 'Failed to update cost price' });
