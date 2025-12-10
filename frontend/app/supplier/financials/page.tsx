@@ -83,13 +83,13 @@ export default function FinancialsPage() {
   const handleAddExpense = async () => {
     if (newExpense.amount && newExpense.category) {
       const amount = Number.parseFloat(newExpense.amount)
-      
+
       // Validate amount is within database constraints (numeric(5,2) allows up to 999.99)
       if (amount > 999.99) {
         setError("Expense amount must be less than $1000")
         return
       }
-      
+
       try {
         const token = localStorage.getItem("token")
         const response = await fetch(`${API_URL}/supplier/expenses`, {
@@ -168,7 +168,7 @@ export default function FinancialsPage() {
                     <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-green-600">+${totalRevenue.toLocaleString()}+</div>
+                    <div className="text-3xl font-bold text-green-600">${totalRevenue.toLocaleString()}</div>
                     <p className="text-xs text-gray-600 mt-2">From {revenue.length} transactions</p>
                   </CardContent>
                 </Card>
@@ -178,7 +178,7 @@ export default function FinancialsPage() {
                     <CardTitle className="text-sm font-medium text-gray-600">Total Expenses</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-red-600">+${totalExpenses.toLocaleString()}+</div>
+                    <div className="text-3xl font-bold text-red-600">${totalExpenses.toLocaleString()}</div>
                     <p className="text-xs text-gray-600 mt-2">{expenses.length} expense records</p>
                   </CardContent>
                 </Card>
