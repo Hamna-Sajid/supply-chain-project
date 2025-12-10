@@ -30,8 +30,8 @@ app.use('/api/analytics', analyticsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Supply Chain Management API is running',
     timestamp: new Date().toISOString()
   });
@@ -40,7 +40,7 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Something went wrong!',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
@@ -55,12 +55,12 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log('='.repeat(50));
-  console.log('🚀 Supply Chain Management System');
+  console.log('Supply Chain Management System');
   console.log('='.repeat(50));
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Frontend: http://localhost:${PORT}`);
-  console.log(`🔌 API: http://localhost:${PORT}/api`);
-  console.log(`💚 Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`Frontend: http://localhost:${PORT}`);
+  console.log(`API: http://localhost:${PORT}/api`);
+  console.log(`Health Check: http://localhost:${PORT}/api/health`);
   console.log('='.repeat(50));
 });
 
