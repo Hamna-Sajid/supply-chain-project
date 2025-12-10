@@ -132,27 +132,35 @@ export function SupplierDashboard() {
               const monthlyData: Record<string, { month: string; revenue: number; expense: number }> = {}
 
               revenues.forEach((r: any) => {
-                const dateStr = r.date || r.created_at
-                const date = new Date(dateStr)
-                const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
-                if (!monthlyData[month]) {
-                  monthlyData[month] = { month, revenue: 0, expense: 0 }
+                const dateStr = r.revenue_update_date || r.date || r.created_at
+                if (dateStr) {
+                  const date = new Date(dateStr)
+                  if (!isNaN(date.getTime())) {
+                    const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+                    if (!monthlyData[month]) {
+                      monthlyData[month] = { month, revenue: 0, expense: 0 }
+                    }
+                    const amount = parseFloat(r.amount) || 0
+                    monthlyData[month].revenue += amount
+                    console.log(`Added revenue: ${amount} for month ${month}`)
+                  }
                 }
-                const amount = parseFloat(r.amount) || 0
-                monthlyData[month].revenue += amount
-                console.log(`Added revenue: ${amount} for month ${month}`)
               })
 
               expenses.forEach((e: any) => {
-                const dateStr = e.date || e.created_at
-                const date = new Date(dateStr)
-                const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
-                if (!monthlyData[month]) {
-                  monthlyData[month] = { month, revenue: 0, expense: 0 }
+                const dateStr = e.expense_update_date || e.date || e.created_at
+                if (dateStr) {
+                  const date = new Date(dateStr)
+                  if (!isNaN(date.getTime())) {
+                    const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+                    if (!monthlyData[month]) {
+                      monthlyData[month] = { month, revenue: 0, expense: 0 }
+                    }
+                    const amount = parseFloat(e.amount) || 0
+                    monthlyData[month].expense += amount
+                    console.log(`Added expense: ${amount} for month ${month}`)
+                  }
                 }
-                const amount = parseFloat(e.amount) || 0
-                monthlyData[month].expense += amount
-                console.log(`Added expense: ${amount} for month ${month}`)
               })
 
               const chartData = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month))
