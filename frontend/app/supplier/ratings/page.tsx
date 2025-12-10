@@ -42,8 +42,8 @@ export default function RatingsReviewsPage() {
           setReviews(data.ratings || [])
 
           if (data.ratings && data.ratings.length > 0) {
-            const avgRating = data.average_rating || (data.ratings.reduce((sum: number, r: Review) => sum + r.rating_value, 0) / data.ratings.length)
-            setAverageRating(Number(avgRating).toFixed(1))
+            const avgRating = data.average_rating || 0
+            setAverageRating(Number(Number(avgRating).toFixed(1)))
 
             // Calculate star distribution
             const distribution = [

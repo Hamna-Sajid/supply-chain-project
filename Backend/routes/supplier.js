@@ -401,7 +401,9 @@ router.get('/ratings', authenticateToken, checkSupplierRole, async (req, res) =>
     const { data, error } = await supabase
       .from('ratings')
       .select(`
-        *,
+        rating_id,
+        rating_value,
+        created_at,
         users!ratings_given_by_fkey(name)
       `)
       .eq('given_to', req.user.userId)
@@ -409,15 +411,23 @@ router.get('/ratings', authenticateToken, checkSupplierRole, async (req, res) =>
 
     if (error) throw error;
 
+    // Map data to frontend format
+    const ratings = (data || []).map(rating => ({
+      id: rating.rating_id,
+      rating_value: rating.rating_value,
+      comment: '', // No comment field in database
+      created_at: rating.created_at,
+      given_by: rating.users?.name || 'Unknown User'
+    }));
+
     // Calculate statistics
-    const ratings = data || [];
     const average = ratings.length > 0
       ? (ratings.reduce((sum, r) => sum + r.rating_value, 0) / ratings.length).toFixed(1)
       : 0;
 
     res.json({
       ratings,
-      average: parseFloat(average),
+      average_rating: parseFloat(average),
       total: ratings.length
     });
   } catch (error) {
@@ -616,7 +626,15 @@ router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) 
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Check if it's a numeric overflow error
+      if (error.message && error.message.includes('numeric field overflow')) {
+        return res.status(400).json({
+          error: 'Expense amount exceeds database limit. Please run the migration to increase the limit: ALTER TABLE expense ALTER COLUMN amount TYPE NUMERIC(12,2);'
+        });
+      }
+      throw error;
+    }
 
     // Map expense_id to id and created_at to date for frontend consistency
     const expense = {

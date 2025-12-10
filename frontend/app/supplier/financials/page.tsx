@@ -84,13 +84,12 @@ export default function FinancialsPage() {
   const handleAddExpense = async () => {
     if (newExpense.amount && newExpense.category) {
       const amount = Number.parseFloat(newExpense.amount)
-      
-      // Validate amount is within database constraints (numeric(5,2) allows up to 999.99)
-      if (amount > 999.99) {
-        setError("Expense amount must be less than $1000")
+
+      if (amount <= 0 || isNaN(amount)) {
+        setError("Please enter a valid positive amount")
         return
       }
-      
+
       try {
         const token = localStorage.getItem("token")
         const response = await fetch(`${API_URL}/supplier/expenses`, {
@@ -179,7 +178,7 @@ export default function FinancialsPage() {
                     <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-green-600">+${totalRevenue.toLocaleString()}+</div>
+                    <div className="text-3xl font-bold text-green-600">${totalRevenue.toLocaleString()}</div>
                     <p className="text-xs text-gray-600 mt-2">From {revenue.length} transactions</p>
                   </CardContent>
                 </Card>
@@ -189,7 +188,7 @@ export default function FinancialsPage() {
                     <CardTitle className="text-sm font-medium text-gray-600">Total Expenses</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-red-600">+${totalExpenses.toLocaleString()}+</div>
+                    <div className="text-3xl font-bold text-red-600">${totalExpenses.toLocaleString()}</div>
                     <p className="text-xs text-gray-600 mt-2">{expenses.length} expense records</p>
                   </CardContent>
                 </Card>
@@ -197,8 +196,8 @@ export default function FinancialsPage() {
 
               {/* Tabs */}
               <div className="mb-6 border-b border-gray-200">
-                <button onClick={() => setActiveTab("revenue")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "revenue" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "revenue" ? { borderBottomColor: "#018790" } : {}}>Revenue Tracking</button>
-                <button onClick={() => setActiveTab("expenses")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "expenses" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "expenses" ? { borderBottomColor: "#018790" } : {}}>Expense Management</button>
+                <button key="revenue-tab" onClick={() => setActiveTab("revenue")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "revenue" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "revenue" ? { borderBottomColor: "#018790" } : {}}>Revenue Tracking</button>
+                <button key="expenses-tab" onClick={() => setActiveTab("expenses")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "expenses" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "expenses" ? { borderBottomColor: "#018790" } : {}}>Expense Management</button>
               </div>
 
               {/* Revenue Tab */}
@@ -223,7 +222,7 @@ export default function FinancialsPage() {
                             revenue.map((transaction, index) => (
                               <tr key={`revenue-${transaction.id}-${index}`} className="border-b hover:bg-gray-50">
                                 <td className="py-3 px-4 font-medium text-blue-600">{transaction.id}</td>
-                                <td className="py-3 px-4 font-semibold text-green-600">+${transaction.amount.toLocaleString()}+</td>
+                                <td className="py-3 px-4 font-semibold text-green-600">${transaction.amount.toLocaleString()}</td>
                                 <td className="py-3 px-4 text-gray-600">{transaction.source}</td>
                                 <td className="py-3 px-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
                               </tr>
@@ -251,12 +250,12 @@ export default function FinancialsPage() {
                       <div>
                         <label className="text-sm font-medium text-gray-700">Category</label>
                         <select value={newExpense.category} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })} className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm">
-                          <option value="">Select category</option>
-                          <option value="Operations">Operations</option>
-                          <option value="Utilities">Utilities</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Transportation">Transportation</option>
-                          <option value="Other">Other</option>
+                          <option key="empty" value="">Select category</option>
+                          <option key="operations" value="Operations">Operations</option>
+                          <option key="utilities" value="Utilities">Utilities</option>
+                          <option key="maintenance" value="Maintenance">Maintenance</option>
+                          <option key="transportation" value="Transportation">Transportation</option>
+                          <option key="other" value="Other">Other</option>
                         </select>
                       </div>
                       <Button onClick={handleAddExpense} className="w-full text-white" style={{ backgroundColor: "#018790" }}>Add Expense</Button>
@@ -283,7 +282,7 @@ export default function FinancialsPage() {
                                 <tr key={`expense-${expense.id}-${index}`} className="border-b hover:bg-gray-50">
                                   <td className="py-3 px-4 font-medium">{expense.id}</td>
                                   <td className="py-3 px-4"><Badge className="bg-blue-100 text-blue-800">{expense.category}</Badge></td>
-                                  <td className="py-3 px-4 font-semibold text-red-600">+${expense.amount.toLocaleString()}+</td>
+                                  <td className="py-3 px-4 font-semibold text-red-600">${expense.amount.toLocaleString()}</td>
                                   <td className="py-3 px-4 text-gray-600">{new Date(expense.date).toLocaleDateString()}</td>
                                   <td className="py-3 px-4"><Button size="sm" variant="outline" className="h-7 text-red-600 hover:text-red-700 bg-transparent" onClick={() => handleDeleteExpense(expense.id)}><Trash2 size={14} /></Button></td>
                                 </tr>
