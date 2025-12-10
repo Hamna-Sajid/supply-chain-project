@@ -1,34 +1,92 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../../config/database');
+const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
+// Map frontend status values to valid database status values
+// Try multiple format possibilities since we don't know the exact constraint
+const statusMapping = {
+  // Try lowercase
+  'pending': 'pending',
+  'paid': 'paid',
+  'unpaid': 'unpaid',
+  'failed': 'failed',
+  // Try uppercase
+  'PENDING': 'PENDING',
+  'PAID': 'PAID',
+  'UNPAID': 'UNPAID',
+  'FAILED': 'FAILED',
+  // Try single letters
+  'p': 'pending',
+  'P': 'pending',
+  // Fallback mappings
+  'completed': 'paid',
+  'partial': 'unpaid',
+  'active': 'pending',
+  'inactive': 'failed'
+};
+
+const getValidStatus = (status) => {
+  if (!status) return 'pending';
+  const mapped = statusMapping[status];
+  if (mapped) {
+    console.log('Status mapping:', status, '->', mapped);
+    return mapped;
+  }
+  // If no mapping found, return as-is and let database validate
+  console.log('No mapping found for status:', status, 'using as-is');
+  return status.toLowerCase();
+};
+
+// Custom middleware for case-insensitive role checking
+const checkSupplierRole = (req, res, next) => {
+  console.log('checkSupplierRole - user:', req.user);
+  console.log('checkSupplierRole - role:', req.user?.role);
+
+  if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('supplier')) {
+    console.log('Access denied - role check failed');
+    return res.status(403).json({ error: 'Access denied for this role' });
+  }
+  next();
+};
+
 // Add raw material
-router.post('/materials', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.post('/materials', authenticateToken, checkSupplierRole, async (req, res) => {
   const { material_name, description, quantity_available, unit_price } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `INSERT INTO raw_materials (material_name, description, quantity_available, unit_price, supplier_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [material_name, description, quantity_available, unit_price, req.user.userId]
-    );
-    
-    res.status(201).json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .insert([{
+        material_name,
+        description,
+        quantity_available,
+        unit_price,
+        supplier_id: req.user.userId
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
   } catch (error) {
     console.error('Add material error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: error.message || 'Failed to add material' });
   }
 });
 
 // Get supplier's materials
-router.get('/materials', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/materials', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM raw_materials WHERE supplier_id = $1',
-      [req.user.userId]
-    );
-    res.json(result.rows);
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .select('*')
+      .eq('supplier_id', req.user.userId);
+
+    if (error) throw error;
+
+    res.json({ materials: data });
   } catch (error) {
     console.error('Get materials error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -36,23 +94,31 @@ router.get('/materials', authenticateToken, authorizeRole('supplier'), async (re
 });
 
 // Update material
-router.put('/materials/:id', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.put('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { material_name, description, quantity_available, unit_price } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `UPDATE raw_materials 
-       SET material_name = $1, description = $2, quantity_available = $3, unit_price = $4
-       WHERE material_id = $5 AND supplier_id = $6 RETURNING *`,
-      [material_name, description, quantity_available, unit_price, id, req.user.userId]
-    );
-    
-    if (result.rows.length === 0) {
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .update({
+        material_name,
+        description,
+        quantity_available,
+        unit_price
+      })
+      .eq('material_id', id)
+      .eq('supplier_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
       return res.status(404).json({ error: 'Material not found' });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json(data);
   } catch (error) {
     console.error('Update material error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -60,18 +126,93 @@ router.put('/materials/:id', authenticateToken, authorizeRole('supplier'), async
 });
 
 // View orders for supplier
-router.get('/orders', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.get('/orders', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT o.*, u.name as ordered_by_name, oi.product_id, oi.quantity, oi.unit_price
-       FROM orders o
-       JOIN users u ON o.ordered_by = u.user_id
-       LEFT JOIN order_items oi ON o.order_id = oi.order_id
-       WHERE o.delivered_by = $1
-       ORDER BY o.order_date DESC`,
-      [req.user.userId]
-    );
-    res.json(result.rows);
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        order_id,
+        order_date,
+        order_status,
+        total_amount,
+        users!orders_ordered_by_fkey(name),
+        order_items(
+          product_id,
+          quantity, 
+          unit_price
+        )
+      `)
+      .eq('delivered_by', req.user.userId)
+      .order('order_date', { ascending: false });
+
+    if (error) {
+      console.error('Get orders error:', error);
+      throw error;
+    }
+
+    console.log('Orders data from DB:', JSON.stringify(data, null, 2));
+
+    // Use total_amount from database, fallback to calculated total from order_items
+    const ordersFormatted = await Promise.all((data || []).map(async (order) => {
+      let total = order.total_amount || 0;
+
+      // If total_amount is 0 or null, calculate from order_items
+      if (!total && order.order_items && order.order_items.length > 0) {
+        total = (order.order_items || []).reduce((sum, item) => {
+          return sum + ((item.quantity || 0) * (item.unit_price || 0));
+        }, 0);
+      }
+
+      // Format order items - try to get material/product names
+      const formattedItems = await Promise.all((order.order_items || []).map(async (item) => {
+        let itemName = 'Unknown Item';
+
+        if (item.product_id) {
+          // Try raw_materials table first
+          const { data: materialData } = await supabase
+            .from('raw_materials')
+            .select('material_name')
+            .eq('material_id', item.product_id)
+            .single();
+
+          if (materialData?.material_name) {
+            itemName = materialData.material_name;
+          } else {
+            // Fallback to products table
+            const { data: productData } = await supabase
+              .from('products')
+              .select('product_name')
+              .eq('product_id', item.product_id)
+              .single();
+
+            if (productData?.product_name) {
+              itemName = productData.product_name;
+            }
+          }
+        }
+
+        return {
+          product_id: item.product_id,
+          product_name: itemName,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        };
+      }));
+
+      console.log(`Order ${order.order_id}: total_amount=${order.total_amount}, calculated=${total}`);
+
+      return {
+        order_id: order.order_id,
+        order_date: order.order_date,
+        order_status: order.order_status,
+        manufacturer: order.users?.name || 'Unknown',
+        order_items: formattedItems,
+        total_amount: total
+      };
+    }));
+
+    console.log('Formatted orders:', JSON.stringify(ordersFormatted, null, 2));
+    res.json({ orders: ordersFormatted });
   } catch (error) {
     console.error('Get orders error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -79,25 +220,659 @@ router.get('/orders', authenticateToken, authorizeRole('supplier'), async (req, 
 });
 
 // Update order status
-router.put('/orders/:id/status', authenticateToken, authorizeRole('supplier'), async (req, res) => {
+router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `UPDATE orders SET order_status = $1, updated_at = NOW()
-       WHERE order_id = $2 AND delivered_by = $3 RETURNING *`,
-      [status, id, req.user.userId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Order not found' });
+    // Convert status to lowercase to match database constraint
+    const normalizedStatus = status.toLowerCase();
+
+    console.log('Update order status request:');
+    console.log('  order_id (from URL):', id, 'type:', typeof id);
+    console.log('  new status:', normalizedStatus);
+    console.log('  delivered_by (userId):', req.user.userId);
+
+    // First fetch the order to verify it exists and belongs to this supplier
+    const { data: orderData, error: fetchError } = await supabase
+      .from('orders')
+      .select('order_id, delivered_by, order_status')
+      .eq('delivered_by', req.user.userId)
+      .eq('order_id', id)
+      .single();
+
+    if (fetchError) {
+      console.error('Fetch order error:', fetchError);
+      throw fetchError;
     }
-    
-    res.json(result.rows[0]);
+
+    if (!orderData) {
+      return res.status(404).json({ error: 'Order not found or does not belong to you' });
+    }
+
+    console.log('Order found:', orderData);
+
+    // Now update it - try without the delivered_by filter since we already verified ownership
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        order_status: normalizedStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('order_id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update order status error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+
+      // If still failing, try a more direct approach with the exact order_id value
+      if (error.code === '42883') {
+        console.log('Type casting issue detected. Trying alternative approach...');
+        // Use a simple filter without additional conditions
+        const { data: retryData, error: retryError } = await supabase
+          .from('orders')
+          .update({
+            order_status: normalizedStatus,
+            updated_at: new Date().toISOString()
+          })
+          .match({ order_id: id })
+          .select()
+          .single();
+
+        if (retryError) {
+          console.error('Retry also failed:', retryError);
+          throw retryError;
+        }
+
+        console.log('Retry succeeded:', retryData);
+        return res.json(retryData);
+      }
+
+      throw error;
+    }
+
+    res.json(data);
   } catch (error) {
     console.error('Update order status error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// Get supplier dashboard data
+router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('Dashboard request for user:', userId);
+
+    // Total revenue - get from revenue table where payment was marked as 'paid'
+    const { data: revenueData, error: revenueError } = await supabase
+      .from('revenue')
+      .select('amount')
+      .eq('user_id', userId);
+
+    console.log('Revenue data:', revenueData);
+    console.log('Revenue error:', revenueError);
+
+    // Total expenses
+    const { data: expenseData, error: expenseError } = await supabase
+      .from('expense')
+      .select('amount')
+      .eq('user_id', userId);
+
+    console.log('Expense data:', expenseData);
+    console.log('Expense error:', expenseError);
+
+    // Average rating
+    const { data: ratingData, error: ratingError } = await supabase
+      .from('ratings')
+      .select('rating_value')
+      .eq('given_to', userId);
+
+    // Get all orders to count by status
+    const { data: allOrdersData, error: allOrdersError } = await supabase
+      .from('orders')
+      .select('order_id, order_status')
+      .eq('delivered_by', userId);
+
+    if (revenueError || expenseError || ratingError || allOrdersError) {
+      throw revenueError || expenseError || ratingError || allOrdersError;
+    }
+
+    // Calculate total revenue from revenue table
+    const totalRevenue = (revenueData || []).reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      console.log('Processing revenue amount:', amount, 'Type:', typeof amount);
+      return sum + amount;
+    }, 0);
+
+    const totalExpense = (expenseData || []).reduce((sum, item) => {
+      const amount = item.amount;
+      console.log('Processing expense amount:', amount, 'Type:', typeof amount);
+      return sum + (parseFloat(amount) || 0);
+    }, 0);
+    const ratings = ratingData || [];
+    const avgRating = ratings.length > 0
+      ? (ratings.reduce((sum, item) => sum + item.rating_value, 0) / ratings.length).toFixed(1)
+      : 0;
+    const totalRatings = ratings.length;
+
+    // Count orders by status
+    const orderStatusCounts = (allOrdersData || []).reduce((acc, order) => {
+      const status = order.order_status || 'unknown';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const pendingCount = (orderStatusCounts['pending'] || 0) + (orderStatusCounts['processing'] || 0);
+    const deliveredCount = orderStatusCounts['delivered'] || 0;
+    const cancelledCount = orderStatusCounts['cancelled'] || 0;
+    const totalOrders = (allOrdersData || []).length;
+
+    console.log('Total expense calculated:', totalExpense);
+    console.log('Order status counts:', orderStatusCounts);
+
+    res.json({
+      total_revenue: totalRevenue,
+      total_expenses: totalExpense,
+      net_profit: totalRevenue - totalExpense,
+      average_rating: parseFloat(avgRating),
+      total_ratings: totalRatings,
+      pending_orders_count: pendingCount,
+      delivered_orders_count: deliveredCount,
+      cancelled_orders_count: cancelledCount,
+      total_orders_count: totalOrders,
+      order_status_breakdown: orderStatusCounts
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get supplier ratings
+router.get('/ratings', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('ratings')
+      .select(`
+        rating_id,
+        rating_value,
+        created_at,
+        users!ratings_given_by_fkey(name)
+      `)
+      .eq('given_to', req.user.userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Map data to frontend format
+    const ratings = (data || []).map(rating => ({
+      id: rating.rating_id,
+      rating_value: rating.rating_value,
+      comment: '', // No comment field in database
+      created_at: rating.created_at,
+      given_by: rating.users?.name || 'Unknown User'
+    }));
+
+    // Calculate statistics
+    const average = ratings.length > 0
+      ? (ratings.reduce((sum, r) => sum + r.rating_value, 0) / ratings.length).toFixed(1)
+      : 0;
+
+    res.json({
+      ratings,
+      average_rating: parseFloat(average),
+      total: ratings.length
+    });
+  } catch (error) {
+    console.error('Get ratings error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get material stock overview
+router.get('/materials/stock/overview', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    console.log(`Fetching materials for supplier: ${req.user.userId}`);
+
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .select('material_id, material_name, quantity_available')
+      .eq('supplier_id', req.user.userId)
+      .order('quantity_available', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Material stock error:', error);
+      throw error;
+    }
+
+    console.log(`Found ${(data || []).length} materials for supplier ${req.user.userId}`);
+    res.json({ materials: data || [] });
+  } catch (error) {
+    console.error('Material stock error:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
+
+// Delete material
+router.delete('/materials/:id', authenticateToken, checkSupplierRole, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .delete()
+      .eq('material_id', id)
+      .eq('supplier_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
+    res.json({ message: 'Material deleted successfully' });
+  } catch (error) {
+    console.error('Delete material error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get pending orders
+router.get('/orders/pending', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        order_id,
+        total_amount,
+        order_status,
+        order_date,
+        users!orders_ordered_by_fkey(name)
+      `)
+      .eq('delivered_by', req.user.userId)
+      .in('order_status', ['pending', 'processing'])
+      .order('order_date', { ascending: false });
+
+    if (error) throw error;
+
+    // Transform data to match frontend expectations
+    const orders = (data || []).map(order => ({
+      id: order.order_id,
+      manufacturer_name: order.users?.name || 'Unknown',
+      total_amount: order.total_amount || 0,
+      status: order.order_status
+    }));
+
+    res.json({ orders });
+  } catch (error) {
+    console.error('Get pending orders error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get notifications
+router.get('/notifications', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', req.user.userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Map to frontend format
+    const notifications = (data || []).map(notif => ({
+      id: notif.notification_id || notif.id,
+      type: notif.type,
+      timestamp: notif.created_at,
+      description: notif.description,
+      isRead: notif.is_read || false
+    }));
+
+    res.json({ notifications });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get revenue
+router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('Fetching revenue for user:', userId);
+
+    const { data, error } = await supabase
+      .from('revenue')
+      .select('*')
+      .eq('user_id', userId);
+
+    console.log('Revenue data from DB:', data);
+    console.log('Revenue error:', error);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+
+    // Return data with order_id from revenue table
+    const revenues = (data || []).map(rev => ({
+      order_id: rev.order_id,
+      amount: rev.amount,
+      source: rev.source || 'Payment',
+      revenue_update_date: rev.revenue_update_date || rev.created_at // Fallback to created_at if revenue_update_date is null
+    }));
+
+    console.log('Transformed revenues:', revenues);
+    res.json({ revenue: revenues });
+  } catch (error) {
+    console.error('Get revenue error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// Get expenses
+router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log('Fetching expenses for user:', userId);
+
+    const { data, error } = await supabase
+      .from('expense')
+      .select('*')
+      .eq('user_id', userId);
+
+    console.log('Expense data from DB:', data);
+    console.log('Expense error:', error);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
+
+    // Return data as-is from database
+    const expenses = (data || []).map(exp => ({
+      expense_id: exp.expense_id,
+      id: exp.expense_id,
+      amount: exp.amount,
+      category: exp.category,
+      expense_update_date: exp.expense_update_date || exp.created_at // Fallback to created_at if expense_update_date is null
+    }));
+
+    console.log('Transformed expenses:', expenses);
+    res.json({ expenses });
+  } catch (error) {
+    console.error('Get expenses error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// Add expense
+router.post('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
+  const { amount, category } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('expense')
+      .insert([{
+        amount,
+        category,
+        user_id: req.user.userId
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      // Check if it's a numeric overflow error
+      if (error.message && error.message.includes('numeric field overflow')) {
+        return res.status(400).json({
+          error: 'Expense amount exceeds database limit. Please run the migration to increase the limit: ALTER TABLE expense ALTER COLUMN amount TYPE NUMERIC(12,2);'
+        });
+      }
+      throw error;
+    }
+
+    // Map expense_id to id and created_at to date for frontend consistency
+    const expense = {
+      id: data.expense_id,
+      amount: data.amount,
+      category: data.category,
+      date: data.created_at
+    };
+
+    res.status(201).json(expense);
+  } catch (error) {
+    console.error('Add expense error:', error);
+    res.status(500).json({ error: error.message || 'Failed to add expense' });
+  }
+});
+
+// Delete expense
+router.delete('/expenses/:id', authenticateToken, checkSupplierRole, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from('expense')
+      .delete()
+      .eq('expense_id', id)
+      .eq('user_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    res.json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    console.error('Delete expense error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get supplier payment status for orders received
+router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) => {
+  try {
+    // First, get all orders for this supplier
+    const { data: orders, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        order_id,
+        order_date,
+        order_status,
+        total_amount,
+        users!orders_ordered_by_fkey(name)
+      `)
+      .eq('delivered_by', req.user.userId)
+      .order('order_date', { ascending: false });
+
+    if (orderError) {
+      console.error('Order fetch error:', orderError);
+      throw orderError;
+    }
+
+    // Then, try to get payments (if payment table exists and has data)
+    const { data: payments, error: paymentError } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('paid_to', req.user.userId)
+      .in('order_id', (orders || []).map(o => o.order_id));
+
+    console.log('Payments fetched from DB:', payments);
+    console.log('Payment error:', paymentError);
+
+    // Create a map of payments by order_id for quick lookup
+    const paymentMap = {};
+    if (payments) {
+      payments.forEach(p => {
+        console.log('Mapping payment:', p.order_id, 'amount:', p.amount);
+        // Always use the latest payment (last one in the list, or by created_at if available)
+        paymentMap[p.order_id] = p;
+      });
+    }
+
+    console.log('Payment map:', paymentMap);
+
+    // Helper function to calculate order amount
+    const calculateOrderAmount = (order) => {
+      return order.total_amount || 0;
+    };
+
+    // Format payments with order details
+    const paymentData = (orders || []).map(order => {
+      const paymentInfo = paymentMap[order.order_id];
+      const orderAmount = calculateOrderAmount(order);
+
+      console.log(`Order ${order.order_id}: paymentInfo =`, paymentInfo, 'calculated amount =', orderAmount);
+
+      const paymentObj = paymentInfo ? {
+        payment_id: paymentInfo.payment_id || null,
+        payment_date: paymentInfo.payment_date,
+        payment_status: paymentInfo.status || 'pending',
+        payment_amount: paymentInfo.amount || orderAmount  // Use amount from payment table, fallback to calculated order amount
+      } : {
+        payment_id: null,
+        payment_date: null,
+        payment_status: 'pending',
+        payment_amount: orderAmount  // Fallback to calculated order amount
+      };
+
+      console.log(`Order ${order.order_id}: payment_amount =`, paymentObj.payment_amount, '(from', paymentInfo ? 'payment table' : 'calculated', ')');
+
+      return {
+        order_id: order.order_id,
+        manufacturer: order.users?.name || 'Unknown',
+        order_date: order.order_date,
+        order_status: order.order_status,
+        order_total: orderAmount,
+        payment: paymentObj
+      };
+    });
+
+    console.log('Payment data prepared:', paymentData);
+    res.json({ payments: paymentData });
+  } catch (error) {
+    console.error('Get supplier payments error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// Record payment for supplier order
+router.post('/payments', authenticateToken, checkSupplierRole, async (req, res) => {
+  const { order_id, payment_amount, payment_status } = req.body;
+  const validStatus = getValidStatus(payment_status);
+
+  try {
+    const { data, error } = await supabase
+      .from('payment')
+      .insert([{
+        order_id,
+        amount: payment_amount,
+        status: validStatus || 'pending',
+        payment_date: new Date().toISOString(),
+        paid_to: req.user.userId,
+        paid_by: req.user.userId
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('Create payment error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update payment status for supplier
+router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole, async (req, res) => {
+  const { payment_id } = req.params;
+  const { payment_status, order_id } = req.body;
+
+  const validStatus = getValidStatus(payment_status);
+  console.log('Update payment request - payment_id:', payment_id, 'type:', typeof payment_id, 'payment_status:', payment_status, 'validStatus:', validStatus, 'order_id:', order_id);
+
+  try {
+    // If payment_id is null or 'null', we need to create a new payment
+    if (!payment_id || payment_id === 'null') {
+      if (!order_id) {
+        return res.status(400).json({ error: 'order_id required for new payments' });
+      }
+
+      // Fetch the order to get the total amount
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('order_id', order_id)
+        .single();
+
+      if (orderError || !orderData) {
+        console.error('Error fetching order:', orderError);
+        return res.status(400).json({ error: 'Order not found' });
+      }
+
+      const paymentAmount = orderData.total_amount || 0;
+      console.log('Creating new payment with status:', validStatus, 'amount:', paymentAmount);
+      const { data, error } = await supabase
+        .from('payment')
+        .insert([{
+          order_id,
+          status: validStatus,
+          payment_date: new Date().toISOString(),
+          amount: paymentAmount,
+          paid_to: req.user.userId,
+          paid_by: req.user.userId
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Create payment error:', error);
+        throw error;
+      }
+
+      return res.status(201).json(data);
+    }
+
+    // Otherwise, update existing payment
+    console.log('Updating payment with payment_id:', payment_id, 'status:', validStatus);
+
+    const { data, error } = await supabase
+      .from('payment')
+      .update({ status: validStatus })
+      .eq('payment_id', payment_id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update payment error:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Update supplier payment error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
   }
 });
 

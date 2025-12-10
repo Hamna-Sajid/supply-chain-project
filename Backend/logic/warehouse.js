@@ -12,10 +12,10 @@ document.getElementById('userName').textContent = user.name;
 function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-    
+
     document.getElementById(tabName).classList.add('active');
     event.target.classList.add('active');
-    
+
     if (tabName === 'shipments') loadShipments();
     else if (tabName === 'inventory') loadInventory();
     else if (tabName === 'orders') loadOrders();
@@ -25,15 +25,15 @@ function showTab(tabName) {
 
 async function loadShipments() {
     showLoading('shipmentsList');
-    
+
     try {
         const shipments = await apiRequest('/warehouse/shipments');
-        
+
         if (shipments.length === 0) {
             document.getElementById('shipmentsList').innerHTML = '<p>No incoming shipments.</p>';
             return;
         }
-        
+
         const html = `
             <table>
                 <thead>
@@ -70,7 +70,7 @@ async function loadShipments() {
                 </tbody>
             </table>
         `;
-        
+
         document.getElementById('shipmentsList').innerHTML = html;
     } catch (error) {
         showError('shipmentsList', error.message);
@@ -79,13 +79,13 @@ async function loadShipments() {
 
 async function updateShipmentStatus(shipmentId, status) {
     if (!status) return;
-    
+
     try {
         await apiRequest(`/warehouse/shipments/${shipmentId}/status`, {
             method: 'PUT',
             body: JSON.stringify({ status })
         });
-        
+
         alert('Shipment status updated!');
         loadShipments();
         if (status === 'delivered') {
@@ -98,15 +98,15 @@ async function updateShipmentStatus(shipmentId, status) {
 
 async function loadInventory() {
     showLoading('inventoryList');
-    
+
     try {
         const inventory = await apiRequest('/warehouse/inventory');
-        
+
         if (inventory.length === 0) {
             document.getElementById('inventoryList').innerHTML = '<p>No inventory items.</p>';
             return;
         }
-        
+
         const html = `
             <table>
                 <thead>
@@ -125,7 +125,7 @@ async function loadInventory() {
                         <tr>
                             <td>${i.product_name}</td>
                             <td>${i.category || 'N/A'}</td>
-                            <td>${i.quantity_available}${i.quantity_available < i.reorder_level ? ' ⚠️' : ''}</td>
+                            <td>${i.quantity_available}${i.quantity_available < i.reorder_level ? ' ' : ''}</td>
                             <td>${formatCurrency(i.cost_price)}</td>
                             <td>${formatCurrency(i.selling_price)}</td>
                             <td>${i.reorder_level}</td>
@@ -135,7 +135,7 @@ async function loadInventory() {
                 </tbody>
             </table>
         `;
-        
+
         document.getElementById('inventoryList').innerHTML = html;
     } catch (error) {
         showError('inventoryList', error.message);
@@ -144,15 +144,15 @@ async function loadInventory() {
 
 async function loadOrders() {
     showLoading('ordersList');
-    
+
     try {
         const orders = await apiRequest('/warehouse/orders');
-        
+
         if (orders.length === 0) {
             document.getElementById('ordersList').innerHTML = '<p>No orders yet.</p>';
             return;
         }
-        
+
         const html = `
             <table>
                 <thead>
@@ -186,7 +186,7 @@ async function loadOrders() {
                 </tbody>
             </table>
         `;
-        
+
         document.getElementById('ordersList').innerHTML = html;
     } catch (error) {
         showError('ordersList', error.message);
@@ -195,13 +195,13 @@ async function loadOrders() {
 
 async function updateOrderStatus(orderId, status) {
     if (!status) return;
-    
+
     try {
         await apiRequest(`/warehouse/orders/${orderId}/status`, {
             method: 'PUT',
             body: JSON.stringify({ status })
         });
-        
+
         alert('Order status updated!');
         loadOrders();
     } catch (error) {
@@ -211,15 +211,15 @@ async function updateOrderStatus(orderId, status) {
 
 async function loadLowStockAlerts() {
     showLoading('alertsList');
-    
+
     try {
         const alerts = await apiRequest('/warehouse/low-stock');
-        
+
         if (alerts.length === 0) {
             document.getElementById('alertsList').innerHTML = '<p class="success-message">All items are well-stocked!</p>';
             return;
         }
-        
+
         const html = `
             <table>
                 <thead>
@@ -236,13 +236,13 @@ async function loadLowStockAlerts() {
                             <td>${a.product_name}</td>
                             <td>${a.quantity_available}</td>
                             <td>${a.reorder_level}</td>
-                            <td><span class="badge badge-pending">⚠️ Reorder Required</span></td>
+                            <td><span class="badge badge-pending"> Reorder Required</span></td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         `;
-        
+
         document.getElementById('alertsList').innerHTML = html;
     } catch (error) {
         showError('alertsList', error.message);
@@ -252,7 +252,7 @@ async function loadLowStockAlerts() {
 async function loadAnalytics() {
     try {
         const analytics = await apiRequest('/analytics/dashboard');
-        
+
         document.getElementById('totalRevenue').textContent = formatCurrency(analytics.total_revenue);
         document.getElementById('totalExpense').textContent = formatCurrency(analytics.total_expense);
         document.getElementById('profit').textContent = formatCurrency(analytics.profit);

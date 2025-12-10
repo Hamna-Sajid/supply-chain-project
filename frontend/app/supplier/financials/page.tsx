@@ -1,0 +1,314 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { SupplierSidebar } from "@/components/supplier-sidebar"
+import { WarehouseHeader } from "@/components/warehouse-header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Trash2 } from "lucide-react"
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+
+interface RevenueTransaction {
+  order_id: string
+  amount: number
+  revenue_update_date: string
+  source: string
+}
+
+interface Expense {
+  id: string
+  amount: number
+  category: string
+  expense_update_date: string
+}
+
+export default function FinancialsPage() {
+  const [activeTab, setActiveTab] = useState("revenue")
+  const [revenue, setRevenue] = useState<RevenueTransaction[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [newExpense, setNewExpense] = useState({ amount: "", category: "" })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+
+  useEffect(() => {
+    const fetchFinancials = async () => {
+      try {
+        setLoading(true)
+        const token = localStorage.getItem("token")
+        if (!token) {
+          setError("Please log in again")
+          return
+        }
+
+        // Fetch revenue
+        const revenueRes = await fetch(`${API_URL}/supplier/revenue`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (revenueRes.ok) {
+          const data = await revenueRes.json()
+          console.log('Revenue response data:', data)
+          console.log('Revenue transactions:', data.revenue || [])
+          setRevenue(data.revenue || [])
+        } else {
+          console.error('Revenue fetch failed:', revenueRes.status)
+        }
+
+        // Fetch expenses
+        const expenseRes = await fetch(`${API_URL}/supplier/expenses`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (expenseRes.ok) {
+          const data = await expenseRes.json()
+          console.log('Expense response data:', data)
+          console.log('Expense records:', data.expenses || [])
+          setExpenses(data.expenses || [])
+        } else {
+          const errorData = await expenseRes.text()
+          console.error('Expense fetch failed:', expenseRes.status, errorData)
+          setError(`Failed to load expenses: ${expenseRes.status}`)
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load financial data")
+        console.error('Fetch error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFinancials()
+  }, [])
+
+  const totalRevenue = revenue.reduce((sum, t) => sum + t.amount, 0)
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
+
+  const handleAddExpense = async () => {
+    if (newExpense.amount && newExpense.category) {
+      const amount = Number.parseFloat(newExpense.amount)
+
+      if (amount <= 0 || isNaN(amount)) {
+        setError("Please enter a valid positive amount")
+        return
+      }
+
+      try {
+        const token = localStorage.getItem("token")
+        const response = await fetch(`${API_URL}/supplier/expenses`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            amount,
+            category: newExpense.category,
+          }),
+        })
+
+        if (response.ok) {
+          const newExp = await response.json()
+          setExpenses([...expenses, newExp])
+          setNewExpense({ amount: "", category: "" })
+          setError("") // Clear any previous errors
+          setSuccess("Expense added successfully!")
+          setTimeout(() => setSuccess(""), 3000)
+        } else {
+          const errorData = await response.json()
+          setError(errorData.error || "Failed to add expense")
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add expense")
+      }
+    }
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`${API_URL}/supplier/expenses/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        setExpenses(expenses.filter((e) => e.id !== id))
+        setSuccess("Expense deleted successfully!")
+        setTimeout(() => setSuccess(""), 3000)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete expense")
+    }
+  }
+
+  return (
+    <div className="flex">
+      <SupplierSidebar />
+      <main className="flex-1 lg:ml-64 bg-gray-50 min-h-screen">
+        <div className="p-6 lg:p-8 relative">
+          <WarehouseHeader />
+
+          <div className="mb-8 pr-48">
+            <h1 className="text-3xl font-bold" style={{ color: "#005461" }}>
+              Financials
+            </h1>
+            <p className="text-gray-600 mt-2">Revenue and expense tracking</p>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+              {success}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">Loading financial data...</p>
+            </div>
+          ) : (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-600">${totalRevenue.toLocaleString()}</div>
+                    <p className="text-xs text-gray-600 mt-2">From {revenue.length} transactions</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600">Total Expenses</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-red-600">${totalExpenses.toLocaleString()}</div>
+                    <p className="text-xs text-gray-600 mt-2">{expenses.length} expense records</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabs */}
+              <div className="mb-6 border-b border-gray-200">
+                <button key="revenue-tab" onClick={() => setActiveTab("revenue")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "revenue" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "revenue" ? { borderBottomColor: "#018790" } : {}}>Revenue Tracking</button>
+                <button key="expenses-tab" onClick={() => setActiveTab("expenses")} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === "expenses" ? "border-b-2 text-[#018790]" : "text-gray-600 hover:text-gray-800"}`} style={activeTab === "expenses" ? { borderBottomColor: "#018790" } : {}}>Expense Management</button>
+              </div>
+
+              {/* Revenue Tab */}
+              {activeTab === "revenue" && (
+                <Card className="border-0 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Revenue History</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Order ID</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Amount</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Source</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {revenue.length > 0 ? (
+                            revenue.map((transaction, index) => (
+                              <tr key={`revenue-${transaction.order_id}-${index}`} className="border-b hover:bg-gray-50">
+                                <td className="py-3 px-4 font-medium text-blue-600">{transaction.order_id || 'N/A'}</td>
+                                <td className="py-3 px-4 font-semibold text-green-600">${transaction.amount.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-gray-600">{transaction.source}</td>
+                                <td className="py-3 px-4 text-sm">
+                                  {transaction.revenue_update_date }
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr><td colSpan={4} className="text-center py-6 text-gray-500">No revenue transactions found</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Expenses Tab */}
+              {activeTab === "expenses" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader><CardTitle className="text-lg">Add New Expense</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Amount</label>
+                        <Input type="number" placeholder="0.00" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} className="mt-1" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Category</label>
+                        <select value={newExpense.category} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })} className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm">
+                          <option key="empty" value="">Select category</option>
+                          <option key="operations" value="Operations">Operations</option>
+                          <option key="utilities" value="Utilities">Utilities</option>
+                          <option key="maintenance" value="Maintenance">Maintenance</option>
+                          <option key="transportation" value="Transportation">Transportation</option>
+                          <option key="other" value="Other">Other</option>
+                        </select>
+                      </div>
+                      <Button onClick={handleAddExpense} className="w-full text-white" style={{ backgroundColor: "#018790" }}>Add Expense</Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="lg:col-span-2 border-0 shadow-sm">
+                    <CardHeader><CardTitle className="text-lg">Expense Records</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-3 px-4 font-semibold text-gray-600">ID</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-600">Category</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-600">Amount</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
+                              <th className="text-left py-3 px-4 font-semibold text-gray-600">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {expenses.length > 0 ? (
+                              expenses.map((expense, index) => (
+                                <tr key={`expense-${expense.id}-${index}`} className="border-b hover:bg-gray-50">
+                                  <td className="py-3 px-4 font-medium">{expense.id}</td>
+                                  <td className="py-3 px-4"><Badge className="bg-blue-100 text-blue-800">{expense.category}</Badge></td>
+                                  <td className="py-3 px-4 font-semibold text-red-600">${expense.amount.toLocaleString()}</td>
+                                  <td className="py-3 px-4 text-gray-600">
+                                    {expense.expense_update_date }
+                                  </td>
+                                  <td className="py-3 px-4"><Button size="sm" variant="outline" className="h-7 text-red-600 hover:text-red-700 bg-transparent" onClick={() => handleDeleteExpense(expense.id)}><Trash2 size={14} /></Button></td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr><td colSpan={5} className="text-center py-6 text-gray-500">No expenses recorded</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}

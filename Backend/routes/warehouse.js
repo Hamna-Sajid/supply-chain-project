@@ -1,169 +1,337 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../../config/database');
+const supabase = require('../../config/database');
 const { authenticateToken, authorizeRole } = require('../../middleware/auth');
 
-// Browse all raw materials
-router.get('/raw-materials', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+// Custom middleware for case-insensitive role checking
+const checkWarehouseRole = (req, res, next) => {
+  if (!req.user || !req.user.role || !req.user.role.toLowerCase().includes('warehouse')) {
+    return res.status(403).json({ error: 'Access denied for this role' });
+  }
+  next();
+};
+
+// ============================================
+// SHIPMENT MANAGEMENT (from manufacturers)
+// ============================================
+
+// Get incoming shipments for warehouse
+router.get('/shipments', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT rm.*, u.name as supplier_name, 
-              COALESCE(AVG(r.rating_value), 0) as avg_rating,
-              COUNT(r.rating_id) as rating_count
-       FROM raw_materials rm
-       JOIN users u ON rm.supplier_id = u.user_id
-       LEFT JOIN ratings r ON r.given_to = u.user_id
-       GROUP BY rm.material_id, u.name
-       ORDER BY avg_rating DESC, rm.unit_price ASC`
-    );
-    res.json(result.rows);
+    const { data, error } = await supabase
+      .from('shipments')
+      .select(`
+        shipment_id,
+        quantity,
+        status,
+        expected_delivery_date,
+        created_at,
+        users!shipments_manufacturer_id_fkey(name)
+      `)
+      .eq('whm_id', req.user.userId)
+      .order('expected_delivery_date', { ascending: true });
+
+    if (error) throw error;
+
+    // Map fields to match frontend expectations
+    const mappedShipments = (data || []).map(s => ({
+      id: s.shipment_id,
+      manufacturer: s.users?.name || 'Unknown',
+      expectedDate: s.expected_delivery_date,
+      currentStatus: s.status.charAt(0).toUpperCase() + s.status.slice(1)
+    }));
+
+    console.log(`Fetched ${mappedShipments.length} shipments for warehouse ${req.user.userId}`);
+    res.json(mappedShipments);
   } catch (error) {
-    console.error('Get raw materials error:', error);
+    console.error('Get shipments error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Place order for raw materials
-router.post('/orders', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { supplier_id, items, shipping_address } = req.body;
-  
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    
-    // Create order
-    const orderResult = await client.query(
-      `INSERT INTO orders (ordered_by, delivered_by, shipping_address, order_status)
-       VALUES ($1, $2, $3, 'pending') RETURNING *`,
-      [req.user.userId, supplier_id, shipping_address]
-    );
-    
-    const orderId = orderResult.rows[0].order_id;
-    
-    // Add order items
-    for (const item of items) {
-      await client.query(
-        `INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, item.material_id, item.quantity, item.unit_price]
-      );
-    }
-    
-    await client.query('COMMIT');
-    res.status(201).json(orderResult.rows[0]);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Place order error:', error);
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    client.release();
-  }
-});
-
-// Create product
-router.post('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { product_name, category, size, color, cost_price, selling_price, production_stage } = req.body;
-  
-  try {
-    const result = await pool.query(
-      `INSERT INTO products (product_name, category, size, color, cost_price, selling_price, manufacturer_id, production_stage)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [product_name, category, size, color, cost_price, selling_price, req.user.userId, production_stage]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Create product error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Get manufacturer's products
-router.get('/products', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM products WHERE manufacturer_id = $1',
-      [req.user.userId]
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Get products error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Update product stage
-router.put('/products/:id/stage', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+// Accept incoming shipment
+router.put('/shipments/:id/accept', authenticateToken, checkWarehouseRole, async (req, res) => {
   const { id } = req.params;
-  const { production_stage } = req.body;
-  
+
   try {
-    const result = await pool.query(
-      `UPDATE products SET production_stage = $1 
-       WHERE product_id = $2 AND manufacturer_id = $3 RETURNING *`,
-      [production_stage, id, req.user.userId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status: 'accepted' })
+      .eq('shipment_id', id)
+      .eq('whm_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Shipment not found' });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json({ message: 'Shipment accepted' });
   } catch (error) {
-    console.error('Update product stage error:', error);
+    console.error('Accept shipment error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Add to inventory
-router.post('/inventory', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { product_id, quantity_available, cost_price, selling_price, reorder_level } = req.body;
-  
+// Reject incoming shipment
+router.put('/shipments/:id/reject', authenticateToken, checkWarehouseRole, async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const result = await pool.query(
-      `INSERT INTO inventory (product_id, user_id, quantity_available, cost_price, selling_price, reorder_level)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [product_id, req.user.userId, quantity_available, cost_price, selling_price, reorder_level]
-    );
-    res.status(201).json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status: 'rejected' })
+      .eq('shipment_id', id)
+      .eq('whm_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    res.json({ message: 'Shipment rejected' });
   } catch (error) {
-    console.error('Add inventory error:', error);
+    console.error('Reject shipment error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// View all warehouses
-router.get('/warehouses', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
+// Update shipment status (in_transit or delivered)
+router.put('/shipments/:id/status', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const userId = req.user.userId;
+
+  if (!['in_transit', 'delivered'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Only in_transit and delivered are allowed.' });
+  }
+
   try {
-    const result = await pool.query(
-      `SELECT u.user_id, u.name, u.address, u.contact_number,
-              COALESCE(AVG(r.rating_value), 0) as avg_rating,
-              COUNT(r.rating_id) as rating_count
-       FROM users u
-       LEFT JOIN ratings r ON r.given_to = u.user_id
-       WHERE u.role = 'warehouse_manager'
-       GROUP BY u.user_id
-       ORDER BY avg_rating DESC`
-    );
-    res.json(result.rows);
+    // Check if user is manufacturer or warehouse for this shipment
+    const { data: shipment, error: fetchError } = await supabase
+      .from('shipments')
+      .select('*')
+      .eq('shipment_id', id)
+      .single();
+
+    if (fetchError || !shipment) {
+      return res.status(404).json({ error: 'Shipment not found' });
+    }
+
+    // Verify user owns this shipment (manufacturer or warehouse)
+    if (shipment.manufacturer_id !== userId && shipment.whm_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { data, error } = await supabase
+      .from('shipments')
+      .update({ status })
+      .eq('shipment_id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ message: `Shipment status updated to ${status}`, shipment: data });
   } catch (error) {
-    console.error('Get warehouses error:', error);
+    console.error('Update shipment status error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Create shipment to warehouse
-router.post('/shipments', authenticateToken, authorizeRole('manufacturer'), async (req, res) => {
-  const { warehouse_id, product_id, quantity, shipping_address, expected_delivery_date } = req.body;
-  
+// ============================================
+// INVENTORY MANAGEMENT
+// ============================================
+
+// Get warehouse inventory
+router.get('/inventory', authenticateToken, checkWarehouseRole, async (req, res) => {
   try {
-    const result = await pool.query(
-      `INSERT INTO shipments (manufacturer_id, whm_id, product_id, quantity, shipping_address, expected_delivery_date, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'preparing') RETURNING *`,
-      [req.user.userId, warehouse_id, product_id, quantity, shipping_address, expected_delivery_date]
-    );
-    res.status(201).json(result.rows[0]);
+    const { data, error } = await supabase
+      .from('inventory')
+      .select(`
+        inventory_id,
+        quantity_available,
+        reorder_level,
+        cost_price,
+        selling_price,
+        products(product_name, category)
+      `)
+      .eq('warehouse_id', req.user.userId)
+      .order('quantity_available', { ascending: true });
+
+    if (error) throw error;
+
+    // Map fields to match frontend expectations
+    const mappedInventory = (data || []).map(item => ({
+      id: item.products?.product_name || 'Unknown',
+      productName: item.products?.product_name || 'Unknown',
+      currentStock: item.quantity_available,
+      reorderLevel: item.reorder_level,
+      category: item.products?.category || 'Unknown'
+    }));
+
+    res.json(mappedInventory);
   } catch (error) {
-    console.error('Create shipment error:', error);
+    console.error('Get inventory error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get low stock items
+router.get('/inventory/low-stock', authenticateToken, checkWarehouseRole, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory')
+      .select(`
+        inventory_id,
+        quantity_available,
+        reorder_level,
+        products(product_name, category)
+      `)
+      .eq('user_id', req.user.userId);
+
+    if (error) throw error;
+
+    // Filter items below reorder level
+    const lowStockItems = (data || []).filter(item => item.quantity_available < item.reorder_level);
+
+    // Map fields to match frontend expectations
+    const mappedItems = lowStockItems.map(item => ({
+      id: item.products?.product_name || 'Unknown',
+      productName: item.products?.product_name || 'Unknown',
+      currentStock: item.quantity_available,
+      reorderLevel: item.reorder_level,
+      category: item.products?.category || 'Unknown'
+    }));
+
+    res.json(mappedItems);
+  } catch (error) {
+    console.error('Get low stock error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================
+// ORDER FULFILLMENT (from retailers)
+// ============================================
+
+// Get orders pending fulfillment
+router.get('/orders', authenticateToken, checkWarehouseRole, async (req, res) => {
+  try {
+    // Get orders that are pending or processing (warehouse fulfillment ready)
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        order_id,
+        total_amount,
+        order_status,
+        order_date,
+        users!orders_ordered_by_fkey(name)
+      `)
+      .in('order_status', ['pending', 'processing'])
+      .order('order_date', { ascending: false });
+
+    if (error) throw error;
+
+    // Map fields and calculate item count
+    const mappedOrders = (data || []).map(o => ({
+      id: o.order_id,
+      retailer: o.users?.name || 'Unknown',
+      itemCount: 0,
+      totalValue: o.total_amount,
+      orderDate: o.order_date,
+      status: o.order_status
+    }));
+
+    res.json({ orders: mappedOrders });
+  } catch (error) {
+    console.error('Get orders error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update order fulfillment status
+router.put('/orders/:id/status', authenticateToken, checkWarehouseRole, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ 
+        order_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('order_id', id)
+      .eq('warehouse_id', req.user.userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json({ message: 'Order status updated' });
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================
+// DASHBOARD METRICS
+// ============================================
+
+// Get warehouse dashboard data
+router.get('/dashboard', authenticateToken, checkWarehouseRole, async (req, res) => {
+  try {
+    console.log(`Fetching dashboard for warehouse: ${req.user.userId}`);
+
+    // Get incoming shipments count for this warehouse (exclude delivered, accepted, rejected)
+    const { data: shipmentsData, error: shipmentsError } = await supabase
+      .from('shipments')
+      .select('shipment_id')
+      .eq('whm_id', req.user.userId)
+      .neq('status', 'delivered')
+      .neq('status', 'accepted')
+      .neq('status', 'rejected');
+
+    // Get inventory value for this warehouse
+    const { data: inventoryData, error: inventoryError } = await supabase
+      .from('inventory')
+      .select('quantity_available, cost_price')
+      .eq('user_id', req.user.userId);
+
+    // Get pending orders count
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('order_id')
+      .in('order_status', ['pending', 'processing']);
+
+    if (shipmentsError || inventoryError || ordersError) {
+      throw shipmentsError || inventoryError || ordersError;
+    }
+
+    const incomingShipments = (shipmentsData || []).length;
+    const totalStockValue = (inventoryData || []).reduce((sum, item) => {
+      return sum + ((item.quantity_available || 0) * (item.cost_price || 0));
+    }, 0);
+    const readyForShipment = (ordersData || []).length;
+
+    res.json({
+      incomingShipments,
+      totalStockValue,
+      readyForShipment
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

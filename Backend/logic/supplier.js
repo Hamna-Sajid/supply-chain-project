@@ -8,7 +8,9 @@ if (user.role !== 'supplier') {
     redirectToDashboard(user.role);
 }
 
-document.getElementById('userName').textContent = user.name;
+if (document.getElementById('userName')) {
+    document.getElementById('userName').textContent = user.name;
+}
 
 function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -177,7 +179,7 @@ async function loadRatings() {
     showLoading('ratingsList');
     
     try {
-        const data = await apiRequest(`/ratings/user/${user.user_id}`);
+        const data = await apiRequest('/supplier/ratings');
         
         const html = `
             <div style="margin-bottom: 20px;">
@@ -215,40 +217,54 @@ async function loadRatings() {
 
 async function loadAnalytics() {
     try {
-        const analytics = await apiRequest('/analytics/dashboard');
+        const analytics = await apiRequest('/supplier/dashboard');
         
-        document.getElementById('totalRevenue').textContent = formatCurrency(analytics.total_revenue);
-        document.getElementById('totalExpense').textContent = formatCurrency(analytics.total_expense);
-        document.getElementById('profit').textContent = formatCurrency(analytics.profit);
-        document.getElementById('avgRating').textContent = parseFloat(analytics.avg_rating).toFixed(1);
+        if (document.getElementById('totalRevenue')) {
+            document.getElementById('totalRevenue').textContent = formatCurrency(analytics.totalRevenue);
+        }
+        if (document.getElementById('totalExpense')) {
+            document.getElementById('totalExpense').textContent = formatCurrency(analytics.totalExpense);
+        }
+        if (document.getElementById('netProfit')) {
+            document.getElementById('netProfit').textContent = formatCurrency(analytics.netProfit);
+        }
+        if (document.getElementById('avgRating')) {
+            document.getElementById('avgRating').textContent = analytics.avgRating;
+        }
         
-        // Load financial records
-        const revenue = await apiRequest('/analytics/revenue');
-        const expense = await apiRequest('/analytics/expense');
-        
-        const html = `
-            <h3>Recent Revenue</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Amount</th>
-                        <th>Order ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${revenue.slice(0, 10).map(r => `
+        // Load financial records from analytics
+        try {
+            const revenue = await apiRequest('/analytics/revenue');
+            const expense = await apiRequest('/analytics/expense');
+            
+            const html = `
+                <h3>Recent Revenue</h3>
+                <table>
+                    <thead>
                         <tr>
-                            <td>${formatDate(r.revenue_update_date)}</td>
-                            <td>${formatCurrency(r.amount)}</td>
-                            <td>${r.order_id ? r.order_id.substring(0, 8) + '...' : 'N/A'}</td>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Order ID</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-        
-        document.getElementById('financialRecords').innerHTML = html;
+                    </thead>
+                    <tbody>
+                        ${revenue.slice(0, 10).map(r => `
+                            <tr>
+                                <td>${formatDate(r.revenue_update_date)}</td>
+                                <td>${formatCurrency(r.amount)}</td>
+                                <td>${r.order_id ? r.order_id.substring(0, 8) + '...' : 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            if (document.getElementById('financialRecords')) {
+                document.getElementById('financialRecords').innerHTML = html;
+            }
+        } catch (error) {
+            console.log('Analytics financial data not available');
+        }
     } catch (error) {
         console.error('Analytics error:', error);
     }
@@ -361,5 +377,157 @@ async function deleteExpense(expenseId) {
     }
 }
 
+async function loadDashboardData() {
+    try {
+        const data = await apiRequest('/supplier/dashboard');
+        
+        document.getElementById('totalRevenue').textContent = formatCurrency(data.totalRevenue);
+        document.getElementById('totalExpense').textContent = formatCurrency(data.totalExpense);
+        document.getElementById('netProfit').textContent = formatCurrency(data.netProfit);
+        document.getElementById('avgRating').textContent = data.avgRating;
+        document.getElementById('totalRatings').textContent = `(${data.totalRatings} reviews)`;
+        document.getElementById('pendingOrdersCount').textContent = data.pendingOrders;
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+async function generateFinancialChart() {
+    try {
+        // This would generate revenue vs expense trend data
+        // In real implementation, this would fetch historical data from analytics endpoints
+        const revenueData = await apiRequest('/analytics/revenue');
+        const expenseData = await apiRequest('/analytics/expense');
+        
+        // Group by month and prepare chart data
+        const chartData = groupDataByMonth(revenueData, expenseData);
+        renderFinancialChart(chartData);
+    } catch (error) {
+        console.error('Error generating chart:', error);
+    }
+}
+
+function groupDataByMonth(revenue, expense) {
+    // Group revenue and expense by month for chart display
+    const monthData = {};
+    
+    revenue.forEach(r => {
+        const date = new Date(r.revenue_update_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthData[monthKey]) monthData[monthKey] = { month: monthKey, revenue: 0, expense: 0 };
+        monthData[monthKey].revenue += r.amount;
+    });
+    
+    expense.forEach(e => {
+        const date = new Date(e.expense_update_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthData[monthKey]) monthData[monthKey] = { month: monthKey, revenue: 0, expense: 0 };
+        monthData[monthKey].expense += e.amount;
+    });
+    
+    return Object.values(monthData).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+function renderFinancialChart(data) {
+    // This function would render a chart using a charting library
+    // For now, just log the data
+    console.log('Financial chart data:', data);
+}
+
+async function generateMaterialStockChart() {
+    try {
+        const materials = await apiRequest('/supplier/materials/stock/overview');
+        // Materials data is ready for chart rendering
+        console.log('Material stock data:', materials);
+    } catch (error) {
+        console.error('Error generating material chart:', error);
+    }
+}
+
+async function loadPendingOrders() {
+    showLoading('pendingOrdersList');
+    
+    try {
+        const orders = await apiRequest('/supplier/orders/pending');
+        
+        if (orders.length === 0) {
+            document.getElementById('pendingOrdersList').innerHTML = '<p>No pending orders.</p>';
+            return;
+        }
+        
+        const html = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Manufacturer</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${orders.map(o => `
+                        <tr>
+                            <td>${o.order_id.substring(0, 8)}...</td>
+                            <td>${o.manufacturer_name}</td>
+                            <td>${formatCurrency(o.total_amount)}</td>
+                            <td><span class="badge badge-${o.order_status}">${o.order_status}</span></td>
+                            <td>${formatDate(o.order_date)}</td>
+                            <td>
+                                <button class="btn btn-primary" onclick="showOrderDetails('${o.order_id}')">View</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        document.getElementById('pendingOrdersList').innerHTML = html;
+    } catch (error) {
+        showError('pendingOrdersList', error.message);
+    }
+}
+
+async function showOrderDetails(orderId) {
+    try {
+        // Fetch detailed order information
+        const orders = await apiRequest('/supplier/orders');
+        const order = orders.find(o => o.order_id === orderId);
+        
+        if (order) {
+            alert(`Order Details:\nID: ${order.order_id}\nCustomer: ${order.ordered_by_name}\nAmount: ${formatCurrency(order.total_amount)}\nStatus: ${order.order_status}`);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Load notifications (simulated for now)
+function loadNotifications() {
+    // This would typically fetch from a notifications endpoint
+    const notifications = [
+        { id: 1, message: 'New order from ABC Manufacturing', time: '2 hours ago' },
+        { id: 2, message: '5-star rating received from XYZ Industries', time: '4 hours ago' },
+        { id: 3, message: 'Order ORD-001 delivery confirmed', time: '1 day ago' },
+        { id: 4, message: 'Payment received for ORD-425', time: '2 days ago' },
+    ];
+    
+    const html = notifications.map(n => `
+        <div style="padding: 10px; border-bottom: 1px solid #eee;">
+            <p style="font-weight: bold; margin: 0;">${n.message}</p>
+            <p style="font-size: 0.85em; color: #666; margin: 5px 0 0 0;">${n.time}</p>
+        </div>
+    `).join('');
+    
+    if (document.getElementById('notificationsList')) {
+        document.getElementById('notificationsList').innerHTML = html;
+    }
+}
+
 // Initial load
 loadMaterials();
+loadDashboardData();
+loadPendingOrders();
+loadNotifications();
