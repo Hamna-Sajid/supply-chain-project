@@ -252,7 +252,7 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
 
     console.log('Order found:', orderData);
 
-    // Now update it - try without the delivered_by filter since we already verified ownership
+    // Now update it using a simple eq filter
     const { data, error } = await supabase
       .from('orders')
       .update({
@@ -270,33 +270,10 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
         details: error.details,
         hint: error.hint
       });
-      
-      // If still failing, try a more direct approach with the exact order_id value
-      if (error.code === '42883') {
-        console.log('Type casting issue detected. Trying alternative approach...');
-        // Use a simple filter without additional conditions
-        const { data: retryData, error: retryError } = await supabase
-          .from('orders')
-          .update({
-            order_status: normalizedStatus,
-            updated_at: new Date().toISOString()
-          })
-          .match({ order_id: id })
-          .select()
-          .single();
-        
-        if (retryError) {
-          console.error('Retry also failed:', retryError);
-          throw retryError;
-        }
-        
-        console.log('Retry succeeded:', retryData);
-        return res.json(retryData);
-      }
-      
       throw error;
     }
 
+    console.log('Order status updated successfully:', data);
     res.json(data);
   } catch (error) {
     console.error('Update order status error:', error);

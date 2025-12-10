@@ -210,7 +210,6 @@ export function SupplierPaymentsPanel() {
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Manufacturer</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Amount</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-600">Payment Date</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Action</th>
                     </tr>
                   </thead>
@@ -228,9 +227,6 @@ export function SupplierPaymentsPanel() {
                           <Badge className={paymentStatusColors[p.payment.payment_status] || "bg-gray-100 text-gray-800"}>
                             {capitalizeStatus(p.payment.payment_status)}
                           </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-gray-600">
-                          {p.payment.payment_date ? new Date(p.payment.payment_date).toLocaleDateString() : "-"}
                         </td>
                         <td className="py-3 px-4">
                           <Button
@@ -286,13 +282,6 @@ export function SupplierPaymentsPanel() {
                     {capitalizeStatus(selectedPayment.payment.payment_status)}
                   </Badge>
                 </div>
-
-                {selectedPayment.payment.payment_date && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-600">PAYMENT DATE</p>
-                    <p className="text-sm">{new Date(selectedPayment.payment.payment_date).toLocaleDateString()}</p>
-                  </div>
-                )}
 
                 <div>
                   <p className="text-xs font-semibold text-gray-600">ORDER DATE</p>
