@@ -774,61 +774,101 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
 // Get orders
 router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res) => {
   try {
-    const { data, error } = await supabase
+    console.log('Fetching orders for user:', req.user.userId);
+    
+    // First, get all orders for this user with supplier info
+    const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select(`
         order_id,
         order_date,
         order_status,
         total_amount,
-        users!orders_delivered_by_fkey(name),
-        order_items(
-          order_item_id,
-          product_id,
-          quantity,
-          unit_price,
-          raw_materials(material_name)
-        )
+        delivered_by,
+        users!orders_delivered_by_fkey(name)
       `)
       .eq('ordered_by', req.user.userId)
       .order('order_date', { ascending: false });
 
-    if (error) throw error;
+    if (ordersError) {
+      console.error('Supabase orders error:', ordersError);
+      throw ordersError;
+    }
 
-    // Use total_amount from database, fallback to calculated total from order_items
-    const ordersFormatted = (data || []).map(order => {
-      let total = order.total_amount || 0;
+    console.log('Orders fetched:', orders?.length);
 
-      // If total_amount is 0, calculate from order_items
-      if (total === 0 && order.order_items && order.order_items.length > 0) {
-        total = (order.order_items || []).reduce((sum, item) => {
-          return sum + (item.quantity * item.unit_price);
-        }, 0);
+    // Get order items with product details
+    const orderIds = (orders || []).map(o => o.order_id);
+    let allOrderItems = [];
+    let materialsMap = {};
+    
+    if (orderIds.length > 0) {
+      // Get order items
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('order_item_id, order_id, product_id, quantity, unit_price')
+        .in('order_id', orderIds);
+
+      if (itemsError) {
+        console.error('Supabase order_items error:', itemsError);
+        throw itemsError;
       }
+      
+      allOrderItems = items || [];
 
-      // Format order items - product_id stores the material_id
-      const formattedItems = (order.order_items || []).map(item => ({
-        order_item_id: item.order_item_id,
-        product_id: item.product_id,  // This is the material_id
-        product_name: item.raw_materials?.material_name || 'Unknown',
-        quantity: item.quantity,
-        unit_price: item.unit_price
-      }));
+      // Get all raw materials to map product_id to material_name
+      const productIds = [...new Set(allOrderItems.map(item => item.product_id).filter(Boolean))];
+      
+      if (productIds.length > 0) {
+        const { data: materials, error: materialsError } = await supabase
+          .from('raw_materials')
+          .select('material_id, material_name')
+          .in('material_id', productIds);
 
+        if (!materialsError && materials) {
+          materials.forEach(mat => {
+            materialsMap[mat.material_id] = mat.material_name;
+          });
+        }
+      }
+    }
+
+    // Combine orders with their items
+    const ordersFormatted = (orders || []).map(order => {
+      const items = allOrderItems.filter(item => item.order_id === order.order_id);
+      
       return {
         order_id: order.order_id,
         order_date: order.order_date,
         order_status: order.order_status,
-        supplier: order.users?.name || 'Unknown',
-        order_items: formattedItems,
-        total_amount: total
+        total_amount: order.total_amount || 0,
+        users: {
+          name: order.users?.name || 'Unknown'
+        },
+        order_items: items.map(item => ({
+          order_item_id: item.order_item_id,
+          product_id: item.product_id,
+          product_name: materialsMap[item.product_id] || 'N/A',
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        }))
       };
     });
 
     res.json({ orders: ordersFormatted });
   } catch (error) {
     console.error('Get orders error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      hint: error.hint,
+      details: error.details
+    });
+    res.status(500).json({ 
+      error: 'Server error',
+      message: error.message,
+      details: error.details
+    });
   }
 });
 
