@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
@@ -41,8 +40,6 @@ export function SupplierPaymentsPanel() {
   const [error, setError] = useState("")
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [newStatus, setNewStatus] = useState("")
-  const [showRecordModal, setShowRecordModal] = useState(false)
-  const [recordAmount, setRecordAmount] = useState("")
 
   useEffect(() => {
     fetchPayments()
@@ -78,40 +75,7 @@ export function SupplierPaymentsPanel() {
     }
   }
 
-  const handleRecordPayment = async () => {
-    if (!selectedPayment || !recordAmount) {
-      alert("Please enter a payment amount")
-      return
-    }
 
-    try {
-      const token = localStorage.getItem("token")
-      const response = await fetch(`${API_URL}/supplier/payments`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          order_id: selectedPayment.order_id,
-          payment_amount: Number(recordAmount),
-          payment_status: "completed",
-        }),
-      })
-
-      if (response.ok) {
-        setShowRecordModal(false)
-        setRecordAmount("")
-        await fetchPayments()
-        alert("Payment recorded successfully!")
-      } else {
-        alert("Failed to record payment")
-      }
-    } catch (err) {
-      console.error("Error recording payment:", err)
-      alert("Error recording payment")
-    }
-  }
 
   const handleUpdateStatus = async () => {
     if (!selectedPayment || !newStatus) {
@@ -275,16 +239,11 @@ export function SupplierPaymentsPanel() {
                             onClick={(e) => {
                               e.stopPropagation()
                               setSelectedPayment(p)
-                              if (p.payment.payment_id) {
-                                setNewStatus(p.payment.payment_status)
-                                setShowStatusModal(true)
-                              } else {
-                                setRecordAmount("")
-                                setShowRecordModal(true)
-                              }
+                              setNewStatus(p.payment.payment_status)
+                              setShowStatusModal(true)
                             }}
                           >
-                            {p.payment.payment_id ? "Update" : "Record"}
+                            Update
                           </Button>
                         </td>
                       </tr>
@@ -354,61 +313,8 @@ export function SupplierPaymentsPanel() {
         </Card>
       </div>
 
-      {/* Record Payment Modal */}
-      {showRecordModal && selectedPayment && !selectedPayment.payment.payment_id && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md border-0 shadow-lg">
-            <CardHeader className="border-b pb-4">
-              <CardTitle className="text-lg">Record Payment</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Order ID</label>
-                <p className="mt-1 text-gray-900 font-semibold">{selectedPayment.order_id}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Order Amount</label>
-                <p className="mt-1 text-gray-900 font-semibold">${(selectedPayment.order_total || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Payment Amount</label>
-                <Input
-                  type="number"
-                  placeholder="Enter payment amount"
-                  value={recordAmount}
-                  onChange={(e) => setRecordAmount(e.target.value)}
-                  step="0.01"
-                  min="0"
-                  className="mt-1"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowRecordModal(false)
-                    setRecordAmount("")
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 text-white"
-                  style={{ backgroundColor: "#018790" }}
-                  onClick={handleRecordPayment}
-                  disabled={!recordAmount || Number(recordAmount) <= 0}
-                >
-                  Record Payment
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Update Payment Status Modal */}
-      {showStatusModal && selectedPayment && selectedPayment.payment.payment_id && (
+      {showStatusModal && selectedPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md border-0 shadow-lg">
             <CardHeader className="border-b pb-4">
