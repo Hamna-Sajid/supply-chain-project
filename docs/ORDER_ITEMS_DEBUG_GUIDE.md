@@ -12,7 +12,7 @@ You should see logs like:
 ```
 [Item 1/1] Processing: { material_id: '...', quantity: 1, unit_price: 100 }
 [Item 1] Payload: { order_id: 'xxx', product_id: 'yyy', quantity: 1, unit_price: 100 }
-[Item 1] ❌ SUPABASE ERROR:
+[Item 1]  SUPABASE ERROR:
 {
   code: '...',
   message: '...',

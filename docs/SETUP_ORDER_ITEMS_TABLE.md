@@ -155,11 +155,11 @@ CREATE TRIGGER order_items_update_timestamp
 
 ## Next Steps
 
-1. ✅ Create the order_items table using one of the methods above
-2. ✅ Restart the backend server
-3. ✅ Try placing an order again
-4. ✅ Check the Supabase dashboard to verify order_items are being created
-5. ✅ Commit the migration file to git
+1.  Create the order_items table using one of the methods above
+2.  Restart the backend server
+3.  Try placing an order again
+4.  Check the Supabase dashboard to verify order_items are being created
+5.  Commit the migration file to git
 
 ```bash
 git add supabase/migrations/20251210_create_order_items_table.sql

@@ -165,8 +165,8 @@ When running the migration:
 
 ## Benefits of This Change
 
-✅ Clear separation between who pays and who receives payment
-✅ Better for multi-tenant payment tracking
-✅ Easier to audit payment flows in the system
-✅ Clearer data model for future features
-✅ Automatic filtering based on user role
+ Clear separation between who pays and who receives payment
+ Better for multi-tenant payment tracking
+ Easier to audit payment flows in the system
+ Clearer data model for future features
+ Automatic filtering based on user role

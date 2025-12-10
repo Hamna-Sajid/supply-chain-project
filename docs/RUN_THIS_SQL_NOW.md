@@ -1,6 +1,6 @@
 # Quick Migration SQL - Copy & Paste into Supabase SQL Editor
 
-## ⚠️ CRITICAL: Run this SQL in your Supabase Database IMMEDIATELY
+##  CRITICAL: Run this SQL in your Supabase Database IMMEDIATELY
 
 **Navigate to:** Supabase Dashboard → Your Project → SQL Editor → New Query
 
@@ -74,12 +74,12 @@ CREATE INDEX IF NOT EXISTS idx_payment_paid_by ON payment(paid_by);
 
 ## What This Does
 
-✅ Adds `paid_by` column (manufacturer who made the payment)
-✅ Adds `paid_to` column (supplier who receives the payment)  
-✅ Populates both columns with correct data
-✅ Updates the revenue trigger to use the new columns
-✅ Makes columns required (NOT NULL)
-✅ Adds performance indexes
+ Adds `paid_by` column (manufacturer who made the payment)
+ Adds `paid_to` column (supplier who receives the payment)  
+ Populates both columns with correct data
+ Updates the revenue trigger to use the new columns
+ Makes columns required (NOT NULL)
+ Adds performance indexes
 
 ## No Risk of Data Loss
 
@@ -89,4 +89,4 @@ CREATE INDEX IF NOT EXISTS idx_payment_paid_by ON payment(paid_by);
 
 ---
 
-**Status:** Backend code ✅ | Database schema ⏳ **← RUN THIS SQL NOW**
+**Status:** Backend code  | Database schema  **← RUN THIS SQL NOW**

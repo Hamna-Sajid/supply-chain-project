@@ -1,14 +1,14 @@
 # Login/Signup Frontend & Backend Integration Guide
 
-## 🎯 Overview
+##  Overview
 
 Complete login and signup functionality integrated between frontend (Next.js) and backend (Express.js). Both old HTML frontend and new Next.js frontend are supported.
 
 ---
 
-## 📊 Current Implementation Status
+##  Current Implementation Status
 
-### ✅ Backend (Express.js)
+###  Backend (Express.js)
 - **Location:** `Backend/routes/auth.js`
 - **Status:** Production Ready
 - **Features:**
@@ -18,7 +18,7 @@ Complete login and signup functionality integrated between frontend (Next.js) an
   - Supabase database integration
   - Error handling and validation
 
-### ✅ Frontend - HTML (Old)
+###  Frontend - HTML (Old)
 - **Location:** `Frontend-html/index.html` + `Backend/logic/auth.js`
 - **Status:** Production Ready
 - **Features:**
@@ -28,7 +28,7 @@ Complete login and signup functionality integrated between frontend (Next.js) an
   - Error messaging
   - Role-based redirection
 
-### ✅ Frontend - Next.js (New)
+###  Frontend - Next.js (New)
 - **Location:** `frontend/app/page.tsx` + `frontend/components/scm-auth-card.tsx`
 - **Status:** Fully Integrated ✨ NEW
 - **Features:**
@@ -209,35 +209,35 @@ Content-Type: application/json
 
 ---
 
-## 🔐 Security Features
+##  Security Features
 
-✅ **Password Hashing**
+ **Password Hashing**
 - Bcryptjs with salt rounds: 10
 - Passwords never stored in plain text
 
-✅ **JWT Tokens**
+ **JWT Tokens**
 - Expiration: 24 hours
 - Signed with JWT_SECRET environment variable
 - Included in Authorization header
 
-✅ **Input Validation**
+ **Input Validation**
 - Password regex validation
 - Email format validation
 - Required field validation
 
-✅ **Error Handling**
+ **Error Handling**
 - No sensitive information in error messages
 - Proper HTTP status codes (401, 403, 500)
 - Specific error messages for debugging
 
-✅ **Session Management**
+ **Session Management**
 - Token stored in localStorage
 - Cleared on logout
 - Validated on each API request
 
 ---
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### Backend Setup
 
@@ -345,7 +345,7 @@ After successful login, users are redirected to their role-specific dashboard:
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 ### Test User Accounts
 
@@ -367,13 +367,13 @@ Password: SupplierPass123!
 
 ### Test Cases
 
-✅ Signup with weak password → Error: "Password is too weak"
-✅ Signup with existing email → Error: "User already exists"
-✅ Login with invalid email → Error: "Invalid credentials"
-✅ Login with wrong password → Error: "Invalid credentials"
-✅ Login with valid credentials → Redirect to dashboard
-✅ Access dashboard without token → Redirect to login
-✅ Logout → Clear token and redirect
+ Signup with weak password → Error: "Password is too weak"
+ Signup with existing email → Error: "User already exists"
+ Login with invalid email → Error: "Invalid credentials"
+ Login with wrong password → Error: "Invalid credentials"
+ Login with valid credentials → Redirect to dashboard
+ Access dashboard without token → Redirect to login
+ Logout → Clear token and redirect
 
 ---
 
@@ -411,7 +411,7 @@ Password: SupplierPass123!
 
 ---
 
-## 📊 Database Schema
+##  Database Schema
 
 ### Users Table
 ```sql
@@ -430,7 +430,7 @@ CREATE TABLE users (
 
 ---
 
-## 🔐 Security Best Practices
+##  Security Best Practices
 
 1. **Never log passwords**
    - Passwords are hashed before storage
@@ -471,7 +471,7 @@ CREATE TABLE users (
 
 ---
 
-## 🚀 Deployment Checklist
+##  Deployment Checklist
 
 - [ ] Set environment variables (DATABASE_URL, JWT_SECRET)
 - [ ] Ensure database is accessible from deployment server
@@ -496,6 +496,6 @@ CREATE TABLE users (
 
 ---
 
-**Status:** ✅ Fully Integrated and Production Ready
+**Status:**  Fully Integrated and Production Ready
 **Last Updated:** December 8, 2025
 **Version:** 1.0

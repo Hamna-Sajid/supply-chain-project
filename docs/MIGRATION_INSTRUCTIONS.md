@@ -166,8 +166,8 @@ Once the SQL runs successfully:
 
 ## Next Steps
 
-1. ✅ Backend code is ready
-2. ⏳ **RUN THE SQL MIGRATION** ← You are here
+1.  Backend code is ready
+2.  **RUN THE SQL MIGRATION** ← You are here
 3. Restart backend server
 4. Test order creation
 5. Verify payment and revenue flow

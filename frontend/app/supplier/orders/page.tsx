@@ -85,7 +85,7 @@ export default function ManufacturerOrdersPage() {
           const errorData = await response.text()
           console.error(`Error response: ${response.status} - ${errorData}`)
           if (response.status === 403) {
-            setError("❌ Access Denied: You are not logged in as a Supplier. Please log in with a supplier account to view supplier orders.")
+            setError(" Access Denied: You are not logged in as a Supplier. Please log in with a supplier account to view supplier orders.")
           } else {
             setError(`Failed to load orders: ${response.status}`)
           }

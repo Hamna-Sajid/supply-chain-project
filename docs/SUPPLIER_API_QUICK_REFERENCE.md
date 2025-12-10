@@ -17,7 +17,7 @@ Authorization: Bearer <your_jwt_token>
 
 ## Endpoints Quick Reference
 
-### 📊 Dashboard & Metrics
+###  Dashboard & Metrics
 
 #### Get Dashboard Metrics
 ```bash
@@ -452,4 +452,4 @@ setInterval(async () => {
 ---
 
 **Last Updated:** December 8, 2025
-**Status:** Production Ready ✅
+**Status:** Production Ready 

@@ -18,7 +18,7 @@ const navigationByRole = {
     { label: "Dashboard", href: "/supplier", icon: "🏠" },
     { label: "Manage Materials", href: "/supplier/manage-materials", icon: "📦" },
     { label: "View Orders", href: "/supplier/view-orders", icon: "📋" },
-    { label: "Order Management", href: "/supplier/order-management", icon: "✅" },
+    { label: "Order Management", href: "/supplier/order-management", icon: "" },
     { label: "Inventory Overview", href: "/supplier/inventory-overview", icon: "📊" },
     { label: "Analytics", href: "/supplier/analytics", icon: "📈" },
   ],
@@ -26,7 +26,7 @@ const navigationByRole = {
     { label: "Dashboard", href: "/warehouse", icon: "🏠" },
     { label: "Shipments", href: "/warehouse/shipments", icon: "📦" },
     { label: "Inventory", href: "/warehouse/inventory", icon: "📊" },
-    { label: "Low Stock Alerts", href: "/warehouse/low-stock-alerts", icon: "⚠️" },
+    { label: "Low Stock Alerts", href: "/warehouse/low-stock-alerts", icon: "" },
     { label: "Orders", href: "/warehouse/orders", icon: "📋" },
   ],
   retailer: [
@@ -58,7 +58,7 @@ export function Sidebar() {
         const user = JSON.parse(userString)
         const userRole = user.role?.toLowerCase() || ""
         setRole(userRole)
-        
+
         // Get navigation items for this role, default to manufacturer if not found
         const items = navigationByRole[userRole as keyof typeof navigationByRole] || navigationByRole.manufacturer
         setNavItems(items)
@@ -93,9 +93,8 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 lg:z-auto transition-transform lg:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 lg:z-auto transition-transform lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         style={{ backgroundColor: "#005461" }}
       >
         <div className="p-6 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>

@@ -57,7 +57,7 @@ app.listen(PORT, () => {
   console.log('='.repeat(50));
   console.log('Supply Chain Management System');
   console.log('='.repeat(50));
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(` Server running on port ${PORT}`);
   console.log(`Frontend: http://localhost:${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
   console.log(`Health Check: http://localhost:${PORT}/api/health`);

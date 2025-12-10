@@ -81,29 +81,29 @@ export function RetailerKPICards() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <RetailerKPICard 
-        title="Today's Sales Revenue" 
-        value={`$${data?.todaysSalesRevenue || 0}`} 
-        icon="💰" 
-        subtitle="Total sales today" 
+      <RetailerKPICard
+        title="Today's Sales Revenue"
+        value={`$${data?.todaysSalesRevenue || 0}`}
+        icon="💰"
+        subtitle="Total sales today"
       />
-      <RetailerKPICard 
-        title="Total Net Profit" 
-        value={`$${data?.totalProfit || 0}`} 
-        icon="📈" 
-        subtitle="Month to date" 
+      <RetailerKPICard
+        title="Total Net Profit"
+        value={`$${data?.totalProfit || 0}`}
+        icon="📈"
+        subtitle="Month to date"
       />
-      <RetailerKPICard 
-        title="Low Stock Items" 
-        value={data?.lowStockItems || 0} 
-        icon="⚠️" 
-        subtitle="Requires reorder" 
+      <RetailerKPICard
+        title="Low Stock Items"
+        value={data?.lowStockItems || 0}
+        icon=""
+        subtitle="Requires reorder"
       />
-      <RetailerKPICard 
-        title="Pending Returns" 
-        value={data?.pendingReturns || 0} 
-        icon="↩️" 
-        subtitle="Awaiting approval" 
+      <RetailerKPICard
+        title="Pending Returns"
+        value={data?.pendingReturns || 0}
+        icon="↩️"
+        subtitle="Awaiting approval"
       />
     </div>
   )

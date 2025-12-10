@@ -597,11 +597,11 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       .single();
 
     if (orderError) {
-      console.error('❌ Order creation error:', orderError);
+      console.error(' Order creation error:', orderError);
       throw orderError;
     }
 
-    console.log('✅ Order created:', orderData);
+    console.log(' Order created:', orderData);
 
     // Automatically create a payment entry for this order
     // COMMENTED OUT: Payment entries are now managed through the /payments endpoint
@@ -621,10 +621,10 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       .single();
 
     if (paymentError) {
-      console.error('⚠️ Warning: Failed to create payment entry:', paymentError);
+      console.error(' Warning: Failed to create payment entry:', paymentError);
       // Don't fail the order creation if payment creation fails
     } else {
-      console.log('✅ Payment entry created:', paymentData);
+      console.log(' Payment entry created:', paymentData);
     }
     */
 
@@ -665,7 +665,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
 
         if (itemError) {
           lastError = itemError;
-          console.error(`[Item ${i + 1}] ❌ SUPABASE ERROR:`, {
+          console.error(`[Item ${i + 1}]  SUPABASE ERROR:`, {
             code: itemError.code,
             message: itemError.message,
             details: itemError.details,
@@ -680,7 +680,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
         }
 
         if (!itemData || itemData.length === 0) {
-          console.warn(`[Item ${i + 1}] ⚠️ No data returned from insert (but no error)`, itemData);
+          console.warn(`[Item ${i + 1}]  No data returned from insert (but no error)`, itemData);
           continue;
         }
 
@@ -727,7 +727,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
 
     // If no items inserted and we have an error
     if (lastError) {
-      console.error(`❌ Failed to insert any items for order ${orderData.order_id}`);
+      console.error(` Failed to insert any items for order ${orderData.order_id}`);
       console.error('Error code:', lastError.code);
 
       // Check for foreign key constraint violation
