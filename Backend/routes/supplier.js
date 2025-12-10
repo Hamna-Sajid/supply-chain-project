@@ -557,13 +557,12 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
       throw error;
     }
 
-    // Transform created_at to date for frontend consistency
+    // Return data with order_id from revenue table
     const revenues = (data || []).map(rev => ({
-      revenue_id: rev.revenue_id || rev.id,
+      order_id: rev.order_id,
       amount: rev.amount,
       source: rev.source || 'Payment',
-      created_at: rev.created_at,
-      date: rev.created_at
+      revenue_update_date: rev.revenue_update_date || rev.created_at // Fallback to created_at if revenue_update_date is null
     }));
 
     console.log('Transformed revenues:', revenues);
@@ -593,14 +592,13 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
       throw error;
     }
 
-    // Transform expense_id to id and created_at to date for frontend consistency
+    // Return data as-is from database
     const expenses = (data || []).map(exp => ({
       expense_id: exp.expense_id,
       id: exp.expense_id,
       amount: exp.amount,
       category: exp.category,
-      created_at: exp.created_at,
-      date: exp.created_at
+      expense_update_date: exp.expense_update_date || exp.created_at // Fallback to created_at if expense_update_date is null
     }));
 
     console.log('Transformed expenses:', expenses);
@@ -713,39 +711,45 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
     if (payments) {
       payments.forEach(p => {
         console.log('Mapping payment:', p.order_id, 'amount:', p.amount);
-        if (!paymentMap[p.order_id]) {
-          paymentMap[p.order_id] = p;
-        }
+        // Always use the latest payment (last one in the list, or by created_at if available)
+        paymentMap[p.order_id] = p;
       });
     }
     
     console.log('Payment map:', paymentMap);
 
+    // Helper function to calculate order amount
+    const calculateOrderAmount = (order) => {
+      return order.total_amount || 0;
+    };
+
     // Format payments with order details
     const paymentData = (orders || []).map(order => {
       const paymentInfo = paymentMap[order.order_id];
-      console.log(`Order ${order.order_id}: paymentInfo =`, paymentInfo);
+      const orderAmount = calculateOrderAmount(order);
+      
+      console.log(`Order ${order.order_id}: paymentInfo =`, paymentInfo, 'calculated amount =', orderAmount);
       
       const paymentObj = paymentInfo ? {
         payment_id: paymentInfo.payment_id || null,
         payment_date: paymentInfo.payment_date,
         payment_status: paymentInfo.status || 'pending',
-        payment_amount: paymentInfo.amount || 0  // Use amount from payment table
+        payment_amount: paymentInfo.amount || orderAmount  // Use amount from payment table, fallback to calculated order amount
       } : {
         payment_id: null,
         payment_date: null,
         payment_status: 'pending',
-        payment_amount: order.total_amount || 0  // Fallback to order total
+        payment_amount: orderAmount  // Fallback to calculated order amount
       };
       
-      console.log(`Order ${order.order_id}: payment_amount =`, paymentObj.payment_amount, '(from', paymentInfo ? 'payment table' : 'fallback', ')');
+      console.log(`Order ${order.order_id}: payment_amount =`, paymentObj.payment_amount, '(from', paymentInfo ? 'payment table' : 'calculated', ')');
       
       return {
         order_id: order.order_id,
         manufacturer: order.users?.name || 'Unknown',
         order_date: order.order_date,
         order_status: order.order_status,
-        order_total: order.total_amount,
+        order_total: orderAmount,
         payment: paymentObj
       };
     });

@@ -12,9 +12,9 @@ import { Trash2 } from "lucide-react"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
 
 interface RevenueTransaction {
-  id: string
+  order_id: string
   amount: number
-  date: string
+  revenue_update_date: string
   source: string
 }
 
@@ -22,7 +22,7 @@ interface Expense {
   id: string
   amount: number
   category: string
-  date: string
+  expense_update_date: string
 }
 
 export default function FinancialsPage() {
@@ -50,6 +50,8 @@ export default function FinancialsPage() {
         })
         if (revenueRes.ok) {
           const data = await revenueRes.json()
+          console.log('Revenue response data:', data)
+          console.log('Revenue transactions:', data.revenue || [])
           setRevenue(data.revenue || [])
         } else {
           console.error('Revenue fetch failed:', revenueRes.status)
@@ -61,6 +63,8 @@ export default function FinancialsPage() {
         })
         if (expenseRes.ok) {
           const data = await expenseRes.json()
+          console.log('Expense response data:', data)
+          console.log('Expense records:', data.expenses || [])
           setExpenses(data.expenses || [])
         } else {
           const errorData = await expenseRes.text()
@@ -211,7 +215,7 @@ export default function FinancialsPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b">
-                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Transaction ID</th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-600">Order ID</th>
                             <th className="text-left py-3 px-4 font-semibold text-gray-600">Amount</th>
                             <th className="text-left py-3 px-4 font-semibold text-gray-600">Source</th>
                             <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
@@ -220,11 +224,13 @@ export default function FinancialsPage() {
                         <tbody>
                           {revenue.length > 0 ? (
                             revenue.map((transaction, index) => (
-                              <tr key={`revenue-${transaction.id}-${index}`} className="border-b hover:bg-gray-50">
-                                <td className="py-3 px-4 font-medium text-blue-600">{transaction.id}</td>
+                              <tr key={`revenue-${transaction.order_id}-${index}`} className="border-b hover:bg-gray-50">
+                                <td className="py-3 px-4 font-medium text-blue-600">{transaction.order_id || 'N/A'}</td>
                                 <td className="py-3 px-4 font-semibold text-green-600">${transaction.amount.toLocaleString()}</td>
                                 <td className="py-3 px-4 text-gray-600">{transaction.source}</td>
-                                <td className="py-3 px-4 text-sm">{new Date(transaction.date).toLocaleDateString()}</td>
+                                <td className="py-3 px-4 text-sm">
+                                  {transaction.revenue_update_date }
+                                </td>
                               </tr>
                             ))
                           ) : (
@@ -283,7 +289,9 @@ export default function FinancialsPage() {
                                   <td className="py-3 px-4 font-medium">{expense.id}</td>
                                   <td className="py-3 px-4"><Badge className="bg-blue-100 text-blue-800">{expense.category}</Badge></td>
                                   <td className="py-3 px-4 font-semibold text-red-600">${expense.amount.toLocaleString()}</td>
-                                  <td className="py-3 px-4 text-gray-600">{new Date(expense.date).toLocaleDateString()}</td>
+                                  <td className="py-3 px-4 text-gray-600">
+                                    {expense.expense_update_date }
+                                  </td>
                                   <td className="py-3 px-4"><Button size="sm" variant="outline" className="h-7 text-red-600 hover:text-red-700 bg-transparent" onClick={() => handleDeleteExpense(expense.id)}><Trash2 size={14} /></Button></td>
                                 </tr>
                               ))

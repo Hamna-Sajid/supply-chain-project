@@ -604,6 +604,8 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
     console.log('✅ Order created:', orderData);
 
     // Automatically create a payment entry for this order
+    // COMMENTED OUT: Payment entries are now managed through the /payments endpoint
+    /*
     console.log('📝 Creating payment entry for order:', orderData.order_id);
     const { data: paymentData, error: paymentError } = await supabase
       .from('payment')
@@ -624,6 +626,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
     } else {
       console.log('✅ Payment entry created:', paymentData);
     }
+    */
 
     // Add order items
     if (!items || items.length === 0) {
@@ -876,9 +879,8 @@ router.get('/payments', authenticateToken, checkManufacturerRole, async (req, re
     const paymentMap = {};
     if (payments) {
       payments.forEach(p => {
-        if (!paymentMap[p.order_id]) {
-          paymentMap[p.order_id] = p;
-        }
+        // Always use the latest payment (last one in the list, or by created_at if available)
+        paymentMap[p.order_id] = p;
       });
     }
 
@@ -896,12 +898,12 @@ router.get('/payments', authenticateToken, checkManufacturerRole, async (req, re
           payment_id: paymentInfo.payment_id || null,
           payment_date: paymentInfo.payment_date,
           payment_status: paymentInfo.status || 'pending',
-          payment_amount: paymentInfo.amount || 0  // Use amount from payment table
+          payment_amount: order.total_amount
         } : {
           payment_id: null,
           payment_date: null,
           payment_status: 'pending',
-          payment_amount: order.total_amount || 0  // Fallback to order total
+          payment_amount: order.total_amount
         }
       };
     });
