@@ -120,6 +120,9 @@ export function SupplierDashboard() {
             const revenueData = await revenueRes.json()
             const expenseData = await expenseRes.json()
 
+            console.log('Revenue data:', revenueData)
+            console.log('Expense data:', expenseData)
+
             // Group data by month for chart display
             const revenues = revenueData.revenue || []
             const expenses = expenseData.expenses || []
@@ -129,24 +132,32 @@ export function SupplierDashboard() {
               const monthlyData: Record<string, { month: string; revenue: number; expense: number }> = {}
 
               revenues.forEach((r: any) => {
-                const date = new Date(r.created_at)
+                const dateStr = r.date || r.created_at
+                const date = new Date(dateStr)
                 const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
                 if (!monthlyData[month]) {
                   monthlyData[month] = { month, revenue: 0, expense: 0 }
                 }
-                monthlyData[month].revenue += r.amount || 0
+                const amount = parseFloat(r.amount) || 0
+                monthlyData[month].revenue += amount
+                console.log(`Added revenue: ${amount} for month ${month}`)
               })
 
               expenses.forEach((e: any) => {
-                const date = new Date(e.created_at)
+                const dateStr = e.date || e.created_at
+                const date = new Date(dateStr)
                 const month = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
                 if (!monthlyData[month]) {
                   monthlyData[month] = { month, revenue: 0, expense: 0 }
                 }
-                monthlyData[month].expense += e.amount || 0
+                const amount = parseFloat(e.amount) || 0
+                monthlyData[month].expense += amount
+                console.log(`Added expense: ${amount} for month ${month}`)
               })
 
-              setRevenueExpenseData(Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month)))
+              const chartData = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month))
+              console.log('Final chart data:', chartData)
+              setRevenueExpenseData(chartData)
             }
           }
         } catch (err) {

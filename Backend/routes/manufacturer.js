@@ -609,7 +609,8 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       .from('payment')
       .insert([{
         order_id: orderData.order_id,
-        user_id: supplier_id,  // The supplier will receive this payment
+        paid_by: req.user.userId,    // Manufacturer making the payment
+        paid_to: supplier_id,         // Supplier receiving the payment
         amount: totalAmount,
         status: 'pending',
         payment_date: new Date().toISOString()
@@ -865,6 +866,7 @@ router.get('/payments', authenticateToken, checkManufacturerRole, async (req, re
     const { data: payments, error: paymentError } = await supabase
       .from('payment')
       .select('*')
+      .eq('paid_by', req.user.userId)
       .in('order_id', (orders || []).map(o => o.order_id));
 
     console.log('Payments fetched:', payments);

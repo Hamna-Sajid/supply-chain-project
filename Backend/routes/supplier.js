@@ -310,12 +310,14 @@ router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) 
     const userId = req.user.userId;
     console.log('Dashboard request for user:', userId);
 
-    // Total revenue
+    // Total revenue - get from revenue table where payment was marked as 'paid'
     const { data: revenueData, error: revenueError } = await supabase
-      .from('orders')
-      .select('total_amount')
-      .eq('delivered_by', userId)
-      .eq('order_status', 'delivered');
+      .from('revenue')
+      .select('amount')
+      .eq('user_id', userId);
+
+    console.log('Revenue data:', revenueData);
+    console.log('Revenue error:', revenueError);
 
     // Total expenses
     const { data: expenseData, error: expenseError } = await supabase
@@ -342,7 +344,13 @@ router.get('/dashboard', authenticateToken, checkSupplierRole, async (req, res) 
       throw revenueError || expenseError || ratingError || allOrdersError;
     }
 
-    const totalRevenue = (revenueData || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
+    // Calculate total revenue from revenue table
+    const totalRevenue = (revenueData || []).reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      console.log('Processing revenue amount:', amount, 'Type:', typeof amount);
+      return sum + amount;
+    }, 0);
+
     const totalExpense = (expenseData || []).reduce((sum, item) => {
       const amount = item.amount;
       console.log('Processing expense amount:', amount, 'Type:', typeof amount);
@@ -523,10 +531,16 @@ router.get('/notifications', authenticateToken, checkSupplierRole, async (req, r
 // Get revenue
 router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
+    const userId = req.user.userId;
+    console.log('Fetching revenue for user:', userId);
+    
     const { data, error } = await supabase
       .from('revenue')
       .select('*')
-      .eq('user_id', req.user.userId);
+      .eq('user_id', userId);
+
+    console.log('Revenue data from DB:', data);
+    console.log('Revenue error:', error);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -535,12 +549,14 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
 
     // Transform created_at to date for frontend consistency
     const revenues = (data || []).map(rev => ({
-      id: rev.id,
+      revenue_id: rev.revenue_id || rev.id,
       amount: rev.amount,
-      source: rev.source || 'Payment',  // Use source if it exists, otherwise use 'Payment'
+      source: rev.source || 'Payment',
+      created_at: rev.created_at,
       date: rev.created_at
     }));
 
+    console.log('Transformed revenues:', revenues);
     res.json({ revenue: revenues });
   } catch (error) {
     console.error('Get revenue error:', error);
@@ -551,10 +567,16 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
 // Get expenses
 router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) => {
   try {
+    const userId = req.user.userId;
+    console.log('Fetching expenses for user:', userId);
+    
     const { data, error } = await supabase
       .from('expense')
       .select('*')
-      .eq('user_id', req.user.userId);
+      .eq('user_id', userId);
+
+    console.log('Expense data from DB:', data);
+    console.log('Expense error:', error);
 
     if (error) {
       console.error('Supabase error:', error);
@@ -563,12 +585,15 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
 
     // Transform expense_id to id and created_at to date for frontend consistency
     const expenses = (data || []).map(exp => ({
+      expense_id: exp.expense_id,
       id: exp.expense_id,
       amount: exp.amount,
       category: exp.category,
+      created_at: exp.created_at,
       date: exp.created_at
     }));
 
+    console.log('Transformed expenses:', expenses);
     res.json({ expenses });
   } catch (error) {
     console.error('Get expenses error:', error);
@@ -659,6 +684,7 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
     const { data: payments, error: paymentError } = await supabase
       .from('payment')
       .select('*')
+      .eq('paid_to', req.user.userId)
       .in('order_id', (orders || []).map(o => o.order_id));
 
     console.log('Payments fetched from DB:', payments);
@@ -727,7 +753,8 @@ router.post('/payments', authenticateToken, checkSupplierRole, async (req, res) 
         amount: payment_amount,
         status: validStatus || 'pending',
         payment_date: new Date().toISOString(),
-        user_id: req.user.userId
+        paid_to: req.user.userId,
+        paid_by: req.user.userId
       }])
       .select()
       .single();
@@ -777,7 +804,8 @@ router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole,
           status: validStatus,
           payment_date: new Date().toISOString(),
           amount: paymentAmount,
-          user_id: req.user.userId
+          paid_to: req.user.userId,
+          paid_by: req.user.userId
         }])
         .select()
         .single();
