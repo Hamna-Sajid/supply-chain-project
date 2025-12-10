@@ -227,7 +227,7 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
   try {
     // Convert status to lowercase to match database constraint
     const normalizedStatus = status.toLowerCase();
-    
+
     console.log('Update order status request:');
     console.log('  order_id (from URL):', id, 'type:', typeof id);
     console.log('  new status:', normalizedStatus);
@@ -270,7 +270,7 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
         details: error.details,
         hint: error.hint
       });
-      
+
       // If still failing, try a more direct approach with the exact order_id value
       if (error.code === '42883') {
         console.log('Type casting issue detected. Trying alternative approach...');
@@ -284,16 +284,16 @@ router.put('/orders/:id/status', authenticateToken, checkSupplierRole, async (re
           .match({ order_id: id })
           .select()
           .single();
-        
+
         if (retryError) {
           console.error('Retry also failed:', retryError);
           throw retryError;
         }
-        
+
         console.log('Retry succeeded:', retryData);
         return res.json(retryData);
       }
-      
+
       throw error;
     }
 
@@ -531,7 +531,16 @@ router.get('/notifications', authenticateToken, checkSupplierRole, async (req, r
 
     if (error) throw error;
 
-    res.json({ notifications: data || [] });
+    // Map to frontend format
+    const notifications = (data || []).map(notif => ({
+      id: notif.notification_id || notif.id,
+      type: notif.type,
+      timestamp: notif.created_at,
+      description: notif.description,
+      isRead: notif.is_read || false
+    }));
+
+    res.json({ notifications });
   } catch (error) {
     console.error('Get notifications error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -543,7 +552,7 @@ router.get('/revenue', authenticateToken, checkSupplierRole, async (req, res) =>
   try {
     const userId = req.user.userId;
     console.log('Fetching revenue for user:', userId);
-    
+
     const { data, error } = await supabase
       .from('revenue')
       .select('*')
@@ -578,7 +587,7 @@ router.get('/expenses', authenticateToken, checkSupplierRole, async (req, res) =
   try {
     const userId = req.user.userId;
     console.log('Fetching expenses for user:', userId);
-    
+
     const { data, error } = await supabase
       .from('expense')
       .select('*')
@@ -715,7 +724,7 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
         paymentMap[p.order_id] = p;
       });
     }
-    
+
     console.log('Payment map:', paymentMap);
 
     // Helper function to calculate order amount
@@ -727,9 +736,9 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
     const paymentData = (orders || []).map(order => {
       const paymentInfo = paymentMap[order.order_id];
       const orderAmount = calculateOrderAmount(order);
-      
+
       console.log(`Order ${order.order_id}: paymentInfo =`, paymentInfo, 'calculated amount =', orderAmount);
-      
+
       const paymentObj = paymentInfo ? {
         payment_id: paymentInfo.payment_id || null,
         payment_date: paymentInfo.payment_date,
@@ -741,9 +750,9 @@ router.get('/payments', authenticateToken, checkSupplierRole, async (req, res) =
         payment_status: 'pending',
         payment_amount: orderAmount  // Fallback to calculated order amount
       };
-      
+
       console.log(`Order ${order.order_id}: payment_amount =`, paymentObj.payment_amount, '(from', paymentInfo ? 'payment table' : 'calculated', ')');
-      
+
       return {
         order_id: order.order_id,
         manufacturer: order.users?.name || 'Unknown',
@@ -842,7 +851,7 @@ router.put('/payments/:payment_id/status', authenticateToken, checkSupplierRole,
 
     // Otherwise, update existing payment
     console.log('Updating payment with payment_id:', payment_id, 'status:', validStatus);
-    
+
     const { data, error } = await supabase
       .from('payment')
       .update({ status: validStatus })

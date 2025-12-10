@@ -165,6 +165,9 @@ export function ManufacturerOrdersPanel() {
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Order ID</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Supplier</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600">Product ID</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600">Product Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-600">Quantity</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Status</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Total</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
@@ -179,6 +182,39 @@ export function ManufacturerOrdersPanel() {
                       >
                         <td className="py-3 px-4 font-medium text-blue-600">{order.order_id}</td>
                         <td className="py-3 px-4">{order.users?.name || "Unknown"}</td>
+                        <td className="py-3 px-4">
+                          {order.order_items && order.order_items.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {order.order_items.map((item, idx) => (
+                                <span key={idx} className="text-xs">{item.product_id}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {order.order_items && order.order_items.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {order.order_items.map((item, idx) => (
+                                <span key={idx} className="text-xs">{item.product_name || 'N/A'}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {order.order_items && order.order_items.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {order.order_items.map((item, idx) => (
+                                <span key={idx} className="text-xs">{item.quantity}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4">
                           <Badge className={statusColors[order.order_status.toLowerCase()] || "bg-gray-100 text-gray-800"}>
                             {capitalizeStatus(order.order_status)}

@@ -643,8 +643,8 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       try {
-        console.log(`[Item ${i + 1}/${items.length}] Processing:`, { 
-          material_id: item.material_id, 
+        console.log(`[Item ${i + 1}/${items.length}] Processing:`, {
+          material_id: item.material_id,
           quantity: item.quantity,
           unit_price: item.unit_price
         });
@@ -655,7 +655,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
           quantity: parseInt(item.quantity) || 1,
           unit_price: parseFloat(item.unit_price) || 0
         };
-        
+
         console.log(`[Item ${i + 1}] Payload:`, orderItemData);
 
         const { data: itemData, error: itemError } = await supabase
@@ -678,23 +678,45 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
           console.error('Product ID:', item.material_id, 'Type:', typeof item.material_id);
           continue;
         }
-        
+
         if (!itemData || itemData.length === 0) {
           console.warn(`[Item ${i + 1}] ⚠️ No data returned from insert (but no error)`, itemData);
           continue;
         }
 
-        console.log(`[Item ${i + 1}] ✅ Inserted successfully:`, itemData[0]);
+        console.log(`[Item ${i + 1}]  Inserted successfully:`, itemData[0]);
         insertedItems.push(itemData[0]);
       } catch (error) {
         lastError = error;
-        console.error(`[Item ${i + 1}] 🔴 Exception:`, error instanceof Error ? error.message : String(error));
+        console.error(`[Item ${i + 1}] Exception:`, error instanceof Error ? error.message : String(error));
       }
     }
 
     // Return success if at least one item was inserted
     if (insertedItems.length > 0) {
-      console.log(`✅ Order ${orderData.order_id} completed with ${insertedItems.length}/${items.length} items`);
+      console.log(`Order ${orderData.order_id} completed with ${insertedItems.length}/${items.length} items`);
+
+      // Create notification for supplier
+      try {
+        const itemsText = insertedItems.map(item =>
+          `${item.quantity}x ${item.product_id}`
+        ).join(', ');
+
+        await supabase
+          .from('notifications')
+          .insert([{
+            user_id: supplier_id,
+            type: 'New Order',
+            description: `New order #${orderData.order_id} received with ${insertedItems.length} item(s): ${itemsText}. Total: $${totalAmount.toFixed(2)}`,
+            is_read: false,
+            created_at: new Date().toISOString()
+          }]);
+        console.log(' Notification created for supplier:', supplier_id);
+      } catch (notifError) {
+        console.error(' Warning: Failed to create notification:', notifError);
+        // Don't fail the order if notification fails
+      }
+
       return res.status(201).json({
         message: `Order placed successfully (${insertedItems.length} of ${items.length} items created)`,
         order: orderData,
@@ -707,10 +729,10 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
     if (lastError) {
       console.error(`❌ Failed to insert any items for order ${orderData.order_id}`);
       console.error('Error code:', lastError.code);
-      
+
       // Check for foreign key constraint violation
       if (lastError.code === '23503' || lastError.message?.includes('foreign key')) {
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to create order items',
           message: 'Foreign key constraint violated. The order_items table may have incorrect constraints. Please run SIMPLE_CREATE_ORDER_ITEMS.sql to recreate it.',
           code: lastError.code,
@@ -718,10 +740,10 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
           details: lastError.details
         });
       }
-      
+
       // Check if it's a "relation does not exist" error
       if (lastError.code === 'PGRST301' || lastError.message?.includes('does not exist')) {
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to create order items',
           message: 'order_items table does not exist. See SIMPLE_CREATE_ORDER_ITEMS.sql to create it.',
           code: lastError.code,
@@ -729,8 +751,8 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
           details: lastError.details
         });
       }
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         error: 'Failed to create order items',
         message: lastError.message,
         code: lastError.code,
@@ -739,7 +761,7 @@ router.post('/orders', authenticateToken, checkManufacturerRole, async (req, res
       });
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to create order items',
       message: 'No items could be inserted and no error was returned'
     });
@@ -764,7 +786,8 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
           order_item_id,
           product_id,
           quantity,
-          unit_price
+          unit_price,
+          raw_materials(material_name)
         )
       `)
       .eq('ordered_by', req.user.userId)
@@ -787,6 +810,7 @@ router.get('/orders', authenticateToken, checkManufacturerRole, async (req, res)
       const formattedItems = (order.order_items || []).map(item => ({
         order_item_id: item.order_item_id,
         product_id: item.product_id,  // This is the material_id
+        product_name: item.raw_materials?.material_name || 'Unknown',
         quantity: item.quantity,
         unit_price: item.unit_price
       }));
@@ -887,7 +911,7 @@ router.get('/payments', authenticateToken, checkManufacturerRole, async (req, re
     // Format payments with order details
     const paymentData = (orders || []).map(order => {
       const paymentInfo = paymentMap[order.order_id];
-      
+
       return {
         order_id: order.order_id,
         supplier: order.users?.name || 'Unknown',
