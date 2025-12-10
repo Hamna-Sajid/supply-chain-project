@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X, Home, Package, Truck, DollarSign, CreditCard, Star, Bell, LogOut } from "lucide-react"
+import { Menu, X, Home, Package, Truck, DollarSign, CreditCard, Star, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navItems = [
@@ -13,7 +13,6 @@ const navItems = [
   { label: "Payments", href: "/supplier/payments", icon: CreditCard },
   { label: "Financials", href: "/supplier/financials", icon: DollarSign },
   { label: "Ratings & Reviews", href: "/supplier/ratings", icon: Star },
-  { label: "Notifications", href: "/supplier/notifications", icon: Bell },
 ]
 
 export function SupplierSidebar() {
@@ -36,9 +35,8 @@ export function SupplierSidebar() {
       </Button>
 
       <aside
-        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 lg:z-auto transition-transform lg:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-40 lg:z-auto transition-transform lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         style={{ backgroundColor: "#005461" }}
       >
         <div className="p-6 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
