@@ -34,6 +34,22 @@ const capitalizeStatus = (status: string) => {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
 
+// Define order status hierarchy (index represents progression)
+const ORDER_STATUS_HIERARCHY: Record<string, number> = {
+  pending: 0,
+  processing: 1,
+  shipped: 2,
+  delivered: 3,
+}
+
+// Get allowed next statuses based on current status
+const getAllowedNextStatuses = (currentStatus: string): string[] => {
+  const currentLevel = ORDER_STATUS_HIERARCHY[currentStatus.toLowerCase()] ?? 0
+  return Object.entries(ORDER_STATUS_HIERARCHY)
+    .filter(([_, level]) => level >= currentLevel)
+    .map(([status]) => status)
+}
+
 export default function ManufacturerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
@@ -195,8 +211,8 @@ export default function ManufacturerOrdersPage() {
                         </thead>
                         <tbody>
                           {filteredOrders.map((order) => (
-                            <tr 
-                              key={order.order_id} 
+                            <tr
+                              key={order.order_id}
                               className="border-b hover:bg-gray-50 cursor-pointer"
                               onClick={() => setSelectedOrder(order)}
                             >
@@ -335,11 +351,13 @@ export default function ManufacturerOrdersPage() {
                       className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm"
                     >
                       <option value="">Select new status</option>
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
+                      {getAllowedNextStatuses(selectedOrder.order_status).map((status) => (
+                        <option key={status} value={status}>
+                          {capitalizeStatus(status)}
+                        </option>
+                      ))}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">Note: You can only move forward in the order lifecycle</p>
                   </div>
                   <div className="flex gap-3 pt-4">
                     <Button

@@ -33,6 +33,20 @@ const capitalizeStatus = (status: string | null | undefined) => {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
 
+// Define payment status hierarchy (index represents progression)
+const PAYMENT_STATUS_HIERARCHY: Record<string, number> = {
+  pending: 0,
+  paid: 1,
+}
+
+// Get allowed next statuses based on current status
+const getAllowedNextPaymentStatuses = (currentStatus: string): string[] => {
+  const currentLevel = PAYMENT_STATUS_HIERARCHY[currentStatus.toLowerCase()] ?? 0
+  return Object.entries(PAYMENT_STATUS_HIERARCHY)
+    .filter(([_, level]) => level >= currentLevel)
+    .map(([status]) => status)
+}
+
 export function SupplierPaymentsPanel() {
   const [payments, setPayments] = useState<PaymentData[]>([])
   const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null)
@@ -94,7 +108,7 @@ export function SupplierPaymentsPanel() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             payment_status: newStatus,
             order_id: selectedPayment.order_id
           }),
@@ -106,15 +120,15 @@ export function SupplierPaymentsPanel() {
         setPayments(
           payments.map((p) =>
             p.order_id === selectedPayment.order_id
-              ? { 
-                  ...p, 
-                  payment: {
-                    payment_id: updatedPayment.payment_id,
-                    payment_date: updatedPayment.payment_date,
-                    payment_status: updatedPayment.status || updatedPayment.payment_status,
-                    payment_amount: updatedPayment.amount || updatedPayment.payment_amount
-                  }
+              ? {
+                ...p,
+                payment: {
+                  payment_id: updatedPayment.payment_id,
+                  payment_date: updatedPayment.payment_date,
+                  payment_status: updatedPayment.status || updatedPayment.payment_status,
+                  payment_amount: updatedPayment.amount || updatedPayment.payment_amount
                 }
+              }
               : p
           )
         )
@@ -337,9 +351,13 @@ export function SupplierPaymentsPanel() {
                   className="mt-1 w-full border border-gray-200 rounded-md p-2 text-sm"
                 >
                   <option value="">Select new status</option>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
+                  {getAllowedNextPaymentStatuses(selectedPayment.payment.payment_status).map((status) => (
+                    <option key={status} value={status}>
+                      {capitalizeStatus(status)}
+                    </option>
+                  ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">Note: You can only mark as paid, not revert to pending</p>
               </div>
               <div className="flex gap-3 pt-4">
                 <Button
